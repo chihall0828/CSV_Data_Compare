@@ -5,6 +5,27 @@ echo "== CSV Data Compare: Codex cleanup =="
 
 cd "$(dirname "$0")/.."
 
+codex_root="$HOME/.cache/codex-runtimes/codex-primary-runtime/dependencies"
+
+find_git() {
+  if command -v git >/dev/null 2>&1; then
+    command -v git
+    return 0
+  fi
+
+  local candidate
+  for candidate in "$codex_root/native/git/cmd/git.exe" "$codex_root/native/git/bin/git.exe"; do
+    if [ -n "$candidate" ] && [ -x "$candidate" ]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+GIT_BIN="$(find_git || true)"
+
 echo "== Remove temporary files =="
 rm -rf .vite
 rm -rf .cache
@@ -31,6 +52,10 @@ if [ -d dist ]; then
 fi
 
 echo "== Git status =="
-git status --short
+if [ -n "$GIT_BIN" ]; then
+  "$GIT_BIN" status --short
+else
+  echo "git was not found; skipping git status." >&2
+fi
 
 echo "== Cleanup complete =="
