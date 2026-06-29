@@ -1,0 +1,22 @@
+node_modules/
+dist/
+.vite/
+.server-logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local development / Codex
+node_modules/
+dist/
+.vite/
+.cache/
+tmp/
+temp/
+coverage/
+*.log
+.env
+.env.*
+.DS_Store
+Thumbs.db
