@@ -1,0 +1,4 @@
+method,valid_epoch_count,RMS_EN_m,final_EN_error_m
+KF_corrected,440,0.75,0.96
+KF_no_bias,440,1.56,2.41
+Single,440,0.47,0.28

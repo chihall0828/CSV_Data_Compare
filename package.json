@@ -1,0 +1,27 @@
+{
+  "name": "csv-data-compare",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "generate:test-samples": "node scripts/generate-test-samples.mjs",
+    "validate:real": "node scripts/validate-real-data.mjs",
+    "validate:excel": "node scripts/validate-excel-and-calculation.mjs",
+    "package:portable": "powershell -ExecutionPolicy Bypass -File scripts/create-portable-package.ps1"
+  },
+  "dependencies": {
+    "chart.js": "^4.5.1",
+    "lucide-react": "^0.468.0",
+    "papaparse": "^5.4.1",
+    "react": "^18.3.1",
+    "react-chartjs-2": "^5.2.0",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5.1.1",
+    "vite": "^7.2.7"
+  }
+}
