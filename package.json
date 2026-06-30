@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:web": "vite build",
+    "build:portable": "vite build",
     "preview": "vite preview",
     "generate:test-samples": "node scripts/generate-test-samples.mjs",
     "validate:real": "node scripts/validate-real-data.mjs",
