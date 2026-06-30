@@ -228,7 +228,7 @@ function makeUniqueHeaders(headerCells, usedColumnCount) {
   });
 }
 
-function rowsToParsedData(rows, sheetName, headerRow = 1) {
+export function rowsToParsedData(rows, sheetName, headerRow = 1) {
   const headerIndex = Math.max(0, headerRow - 1);
   const headerCells = rows[headerIndex] ?? [];
   let usedColumnCount = 0;
@@ -282,7 +282,7 @@ export async function parseXlsxWorkbook(arrayBuffer, options = {}) {
     try {
       const rows = parseWorksheetRows(sheetXml, sharedStrings);
       const parsed = rowsToParsedData(rows, sheet.name, headerRow);
-      sheets.push({ ...sheet, parsed, headerRow });
+      sheets.push({ ...sheet, parsed, headerRow, rawRows: rows });
     } catch (error) {
       warnings.push(error.message);
     }

@@ -41,7 +41,7 @@ import {
   unionColumns
 } from "./dataUtils.js";
 import { compileFormula, evaluateCompiledFormula, formulaHelpText } from "./formulaUtils.js";
-import { parseXlsxWorkbook } from "./xlsxUtils.js";
+import { parseXlsxWorkbook, rowsToParsedData } from "./xlsxUtils.js";
 
 const APP_NAME = "CSV Data Compare";
 const DISPLAY_SETTINGS_KEY = "csv-data-compare-display-settings";
@@ -56,7 +56,9 @@ const DEFAULT_DISPLAY_SETTINGS = {
   titleFontSize: 18,
   axisLabelFontSize: 14,
   tickFontSize: 12,
-  legendFontSize: 12
+  legendFontSize: 12,
+  pngBackground: "white",
+  pngScale: 2
 };
 
 const LEGEND_MODES = [
@@ -304,7 +306,9 @@ function readDisplaySettings() {
       xMin: parsed.xMin ?? "",
       xMax: parsed.xMax ?? "",
       yMin: parsed.yMin ?? "",
-      yMax: parsed.yMax ?? ""
+      yMax: parsed.yMax ?? "",
+      pngBackground: ["white", "transparent"].includes(parsed.pngBackground) ? parsed.pngBackground : DEFAULT_DISPLAY_SETTINGS.pngBackground,
+      pngScale: [1, 2, 3].includes(Number(parsed.pngScale)) ? Number(parsed.pngScale) : DEFAULT_DISPLAY_SETTINGS.pngScale
     };
   } catch {
     return DEFAULT_DISPLAY_SETTINGS;
@@ -442,18 +446,19 @@ function safeFilePart(value) {
     .slice(0, 64) || "dataset";
 }
 
-function chooseSampleLoadMode(hasExisting, label) {
-  if (!hasExisting) return "add";
-  const choice = window.prompt(
-    `${label}を読み込む前に既存データがあります。\n\n「置換」: 既存データを消して読み込む\n「追加」: 既存データに追加する\n「中止」: 何もしない`,
-    "置換"
-  );
-  if (choice === null) return "cancel";
+function showModal(config) {
+  return new Promise((resolve) => {
+    modalResolveRef.current = resolve;
+    setModal(config);
+  });
+}
 
-  const normalized = choice.trim().toLowerCase();
-  if (["置換", "replace", "r"].includes(normalized)) return "replace";
-  if (["追加", "add", "a"].includes(normalized)) return "add";
-  return "cancel";
+function closeModal(result) {
+  if (modalResolveRef.current) {
+    modalResolveRef.current(result);
+    modalResolveRef.current = null;
+  }
+  setModal(null);
 }
 
 function xTypeLabel(type) {
@@ -490,9 +495,13 @@ export default function App() {
   const [isDragging, setIsDragging] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
   const [messages, setMessages] = useState([]);
+  const [pngBackground, setPngBackground] = useState(initialDisplaySettings.pngBackground ?? DEFAULT_DISPLAY_SETTINGS.pngBackground);
+  const [pngScale, setPngScale] = useState(initialDisplaySettings.pngScale ?? DEFAULT_DISPLAY_SETTINGS.pngScale);
+  const [modal, setModal] = useState(null);
   const fileInputRef = useRef(null);
   const settingsInputRef = useRef(null);
   const chartRef = useRef(null);
+  const modalResolveRef = useRef(null);
 
   useEffect(() => {
     try {
@@ -519,7 +528,9 @@ export default function App() {
           titleFontSize,
           axisLabelFontSize,
           tickFontSize,
-          legendFontSize
+          legendFontSize,
+          pngBackground,
+          pngScale
         })
       );
     } catch {
@@ -536,6 +547,8 @@ export default function App() {
     legendMode,
     lineWidth,
     markerSize,
+    pngBackground,
+    pngScale,
     selectedYColumns,
     showPointMarkers,
     tickFontSize,
@@ -574,6 +587,21 @@ export default function App() {
       // Dataset settings are a convenience; plotting still works without them.
     }
   }, [datasets]);
+
+  useEffect(() => {
+    if (!modal) return;
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        if (modalResolveRef.current) {
+          modalResolveRef.current(null);
+          modalResolveRef.current = null;
+        }
+        setModal(null);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [modal]);
 
   const activeDatasets = useMemo(() => datasets.filter((dataset) => dataset.active), [datasets]);
   const allNumericColumns = useMemo(() => unionColumns(datasets, (dataset) => dataset.numericColumns), [datasets]);
@@ -1097,10 +1125,14 @@ export default function App() {
 
   async function loadCsvUrls(urls, successText, label = "サンプルCSV") {
     const hadExisting = datasets.length > 0;
-    const mode = chooseSampleLoadMode(hadExisting, label);
-    if (mode === "cancel") {
-      setMessages([{ type: "warning", text: `${label}の読み込みを中止しました。` }]);
-      return;
+    let mode = "add";
+    if (hadExisting) {
+      const choice = await showModal({ type: "sampleLoad", label });
+      if (!choice) {
+        setMessages([{ type: "warning", text: `${label}の読み込みを中止しました。` }]);
+        return;
+      }
+      mode = choice;
     }
 
     setIsParsing(true);
@@ -1326,8 +1358,8 @@ export default function App() {
     setter(clampNumber(value, min, max, fallback));
   }
 
-  function resetDisplaySettings() {
-    const ok = window.confirm("Reset display settings and per-file filters? Loaded CSV data will stay open.");
+  async function resetDisplaySettings() {
+    const ok = await showModal({ type: "resetConfirm" });
     if (!ok) return;
     try {
       window.localStorage.removeItem(DISPLAY_SETTINGS_KEY);
@@ -1356,6 +1388,8 @@ export default function App() {
     setAxisLabelFontSize(DEFAULT_DISPLAY_SETTINGS.axisLabelFontSize);
     setTickFontSize(DEFAULT_DISPLAY_SETTINGS.tickFontSize);
     setLegendFontSize(DEFAULT_DISPLAY_SETTINGS.legendFontSize);
+    setPngBackground(DEFAULT_DISPLAY_SETTINGS.pngBackground);
+    setPngScale(DEFAULT_DISPLAY_SETTINGS.pngScale);
     setDatasets((current) =>
       current.map((dataset) => ({
         ...dataset,
@@ -1403,7 +1437,9 @@ export default function App() {
         titleFontSize,
         axisLabelFontSize,
         tickFontSize,
-        legendFontSize
+        legendFontSize,
+        pngBackground,
+        pngScale
       },
       datasets: Object.fromEntries(
         datasets.map((dataset) => [
@@ -1466,6 +1502,8 @@ export default function App() {
       setAxisLabelFontSize(clampNumber(display.axisLabelFontSize, 8, 30, DEFAULT_DISPLAY_SETTINGS.axisLabelFontSize));
       setTickFontSize(clampNumber(display.tickFontSize, 8, 24, DEFAULT_DISPLAY_SETTINGS.tickFontSize));
       setLegendFontSize(clampNumber(display.legendFontSize, 8, 24, DEFAULT_DISPLAY_SETTINGS.legendFontSize));
+      if (["white", "transparent"].includes(display.pngBackground)) setPngBackground(display.pngBackground);
+      if ([1, 2, 3].includes(Number(display.pngScale))) setPngScale(Number(display.pngScale));
       setDatasets((current) => current.map((dataset) => applyStoredDatasetSettings(dataset, datasetSettings)));
       setMessages([{ type: "success", text: "Settings were imported. Reload the same CSV files to restore file-specific settings if needed." }]);
     } catch (error) {
@@ -1532,6 +1570,52 @@ export default function App() {
     }
 
     setMessages([{ type: "success", text: `Sheetを ${sheetName} に切り替えました。` }]);
+  }
+
+  function changeDatasetHeaderRow(id, draftValue) {
+    const currentDataset = datasets.find((dataset) => dataset.id === id);
+    if (!currentDataset || currentDataset.sourceType !== "excel") return;
+
+    const parsed = Number(draftValue);
+    const clamped = Number.isFinite(parsed) && parsed >= 1 ? Math.max(1, Math.floor(parsed)) : currentDataset.headerRow ?? 1;
+    const sheet = currentDataset.workbookSheets?.find((item) => item.name === currentDataset.sheetName);
+    if (!sheet?.rawRows) return;
+
+    try {
+      const reparsed = rowsToParsedData(sheet.rawRows, currentDataset.sheetName, clamped);
+      const analyzed = analyzeParsedCsv(reparsed, currentDataset.name, currentDataset.color);
+      const nextDataset = applyStoredDatasetSettings({
+        ...analyzed,
+        id: currentDataset.id,
+        color: currentDataset.color,
+        active: currentDataset.active,
+        sourceType: "excel",
+        fileName: currentDataset.fileName,
+        sheetName: currentDataset.sheetName,
+        sheetNames: currentDataset.sheetNames,
+        workbookSheets: currentDataset.workbookSheets,
+        excelWarnings: currentDataset.excelWarnings,
+        headerRow: clamped,
+        fileSize: currentDataset.fileSize,
+        lastModified: currentDataset.lastModified,
+        sourceFingerprint: currentDataset.sourceFingerprint,
+        contentHash: currentDataset.contentHash
+      });
+
+      setDatasets((current) => {
+        const nextDatasets = current.map((dataset) => (dataset.id === id ? nextDataset : dataset));
+        setSelectedYColumns((currentY) => {
+          const stillUsable = currentY.filter((column) => nextDatasets.some((dataset) => dataset.numericColumns.includes(column)));
+          return stillUsable.length ? stillUsable : pickInitialYColumns(nextDatasets);
+        });
+        return nextDatasets;
+      });
+      if (globalXColumn && !nextDataset.columns.includes(globalXColumn)) {
+        setGlobalXColumn(nextDataset.xColumn);
+      }
+    } catch (error) {
+      setMessages([{ type: "error", text: `${currentDataset.name}: Header row ${clamped}: ${error.message}` }]);
+    }
   }
 
   function removeDataset(id) {
@@ -1673,8 +1757,18 @@ export default function App() {
       setMessages([{ type: "error", text: "保存できるグラフがありません。" }]);
       return;
     }
+    const srcCanvas = chart.canvas;
+    const offscreen = document.createElement("canvas");
+    offscreen.width = srcCanvas.width * pngScale;
+    offscreen.height = srcCanvas.height * pngScale;
+    const ctx = offscreen.getContext("2d");
+    if (pngBackground === "white") {
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, offscreen.width, offscreen.height);
+    }
+    ctx.drawImage(srcCanvas, 0, 0, offscreen.width, offscreen.height);
     const link = document.createElement("a");
-    link.href = chart.toBase64Image("image/png", 1);
+    link.href = offscreen.toDataURL("image/png");
     link.download = buildPngFilename();
     link.click();
   }
@@ -1844,6 +1938,18 @@ export default function App() {
                           <option key={sheetName} value={sheetName}>{sheetName}</option>
                         ))}
                       </select>
+                    </label>
+                  )}
+                  {dataset.sourceType === "excel" && (
+                    <label className="preset-row">
+                      Header row
+                      <input
+                        type="number"
+                        min="1"
+                        className="header-row-input"
+                        value={dataset.headerRow ?? 1}
+                        onChange={(event) => changeDatasetHeaderRow(dataset.id, event.target.value)}
+                      />
                     </label>
                   )}
                   <div className="dataset-selects">
@@ -2364,6 +2470,27 @@ export default function App() {
             />
           </div>
 
+          <div className="field">
+            <span>PNG保存設定</span>
+            <div className="style-grid">
+              <label>
+                Background
+                <select value={pngBackground} onChange={(event) => setPngBackground(event.target.value)}>
+                  <option value="white">White</option>
+                  <option value="transparent">Transparent</option>
+                </select>
+              </label>
+              <label>
+                Scale
+                <select value={pngScale} onChange={(event) => setPngScale(Number(event.target.value))}>
+                  <option value={1}>1× (standard)</option>
+                  <option value={2}>2× (recommended)</option>
+                  <option value={3}>3× (high-res)</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
           <button type="button" className="download-button" onClick={downloadChart} disabled={!hasChart}>
             <Download size={17} />
             {graphMode === "enu" ? "Save XY Plot PNG" : "Save Time Series PNG"}
@@ -2462,6 +2589,34 @@ export default function App() {
           )}
         </section>
       </section>
+
+      {modal && (
+        <div className="modal-overlay" onClick={() => closeModal(null)}>
+          <div className="modal-dialog" onClick={(event) => event.stopPropagation()}>
+            {modal.type === "sampleLoad" && (
+              <>
+                <h3>サンプルデータの読み込み</h3>
+                <p>{modal.label}を読み込む前に既存データがあります。</p>
+                <div className="modal-actions">
+                  <button type="button" onClick={() => closeModal("replace")}>置換</button>
+                  <button type="button" onClick={() => closeModal("add")}>追加</button>
+                  <button type="button" onClick={() => closeModal(null)}>中止</button>
+                </div>
+              </>
+            )}
+            {modal.type === "resetConfirm" && (
+              <>
+                <h3>設定リセット</h3>
+                <p>Reset display settings and per-file filters? Loaded CSV data will stay open.</p>
+                <div className="modal-actions">
+                  <button type="button" onClick={() => closeModal(true)}>Reset</button>
+                  <button type="button" onClick={() => closeModal(null)}>Cancel</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </main>
   );
 }
