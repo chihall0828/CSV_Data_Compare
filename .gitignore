@@ -20,3 +20,6 @@ coverage/
 .env.*
 .DS_Store
 Thumbs.db
+
+# Release verification / temporary extraction folders
+release/verify-extract-*/
