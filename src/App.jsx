@@ -42,6 +42,7 @@ import {
 } from "./dataUtils.js";
 import { compileFormula, evaluateCompiledFormula, formulaHelpText } from "./formulaUtils.js";
 import { parseXlsxWorkbook, rowsToParsedData } from "./xlsxUtils.js";
+import StatisticsPanel from "./StatisticsPanel.jsx";
 
 const APP_NAME = "CSV Data Compare";
 const DISPLAY_SETTINGS_KEY = "csv-data-compare-display-settings";
@@ -2589,6 +2590,8 @@ export default function App() {
           )}
         </section>
       </section>
+
+      <StatisticsPanel datasets={datasets} />
 
       {modal && (
         <div className="modal-overlay" onClick={() => closeModal(null)}>

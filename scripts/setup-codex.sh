@@ -91,4 +91,8 @@ if [ -f scripts/validate-excel-and-calculation.mjs ]; then
   run_node scripts/validate-excel-and-calculation.mjs
 fi
 
+if [ -f scripts/validate-statistics.mjs ]; then
+  run_node scripts/validate-statistics.mjs
+fi
+
 echo "== Setup complete =="
