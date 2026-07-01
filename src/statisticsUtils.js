@@ -1,15 +1,18 @@
 import { toNumber, isMissingValue, applyRowFilter } from "./dataUtils.js";
 
+function parseNumericCell(row, column) {
+  const raw = row[column];
+  if (raw === null || raw === undefined || isMissingValue(raw)) {
+    return null;
+  }
+  return toNumber(raw);
+}
+
 export function extractNumericValues(rows, column) {
   const values = [];
   let missingCount = 0;
   for (const row of rows) {
-    const raw = row[column];
-    if (raw === null || raw === undefined || isMissingValue(raw)) {
-      missingCount += 1;
-      continue;
-    }
-    const num = toNumber(raw);
+    const num = parseNumericCell(row, column);
     if (num === null) {
       missingCount += 1;
       continue;
@@ -51,6 +54,56 @@ export function computeUnivariate(values) {
   }
 
   return { n, mean, variance, stddev, min, max, median };
+}
+
+export function extractNumericPairs(rows, columnA, columnB) {
+  const pairs = [];
+  let excludedCount = 0;
+  for (const row of rows) {
+    const a = parseNumericCell(row, columnA);
+    const b = parseNumericCell(row, columnB);
+    if (a === null || b === null) {
+      excludedCount += 1;
+      continue;
+    }
+    pairs.push([a, b]);
+  }
+  return { pairs, excludedCount };
+}
+
+export function computeBivariate(pairs) {
+  const n = pairs.length;
+  if (n < 2) {
+    return { n, covariance: null, pearson: null, rSquared: null };
+  }
+
+  let sumA = 0;
+  let sumB = 0;
+  for (const [a, b] of pairs) {
+    sumA += a;
+    sumB += b;
+  }
+  const meanA = sumA / n;
+  const meanB = sumB / n;
+
+  let crossSum = 0;
+  let sumSqA = 0;
+  let sumSqB = 0;
+  for (const [a, b] of pairs) {
+    const deltaA = a - meanA;
+    const deltaB = b - meanB;
+    crossSum += deltaA * deltaB;
+    sumSqA += deltaA ** 2;
+    sumSqB += deltaB ** 2;
+  }
+
+  const covariance = crossSum / (n - 1);
+  if (sumSqA === 0 || sumSqB === 0) {
+    return { n, covariance, pearson: null, rSquared: null };
+  }
+
+  const pearson = crossSum / Math.sqrt(sumSqA * sumSqB);
+  return { n, covariance, pearson, rSquared: pearson ** 2 };
 }
 
 export function seededRandomSample(rows, n, seed = 42) {

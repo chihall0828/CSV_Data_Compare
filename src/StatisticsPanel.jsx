@@ -3,7 +3,9 @@ import { BarChart3 } from "lucide-react";
 import { applyRowFilter } from "./dataUtils.js";
 import {
   extractNumericValues,
+  extractNumericPairs,
   computeUnivariate,
+  computeBivariate,
   applySampleMode,
   formatStatValue
 } from "./statisticsUtils.js";
@@ -33,6 +35,8 @@ function StatRow({ label, value, integer }) {
 export default function StatisticsPanel({ datasets }) {
   const [datasetId, setDatasetId] = useState("");
   const [column, setColumn] = useState("");
+  const [columnA, setColumnA] = useState("");
+  const [columnB, setColumnB] = useState("");
   const [sampleMode, setSampleMode] = useState("all");
   const [sampleN, setSampleN] = useState("100");
   const [sampleSeed, setSampleSeed] = useState("42");
@@ -48,12 +52,26 @@ export default function StatisticsPanel({ datasets }) {
   function handleDatasetChange(id) {
     setDatasetId(id);
     setColumn("");
+    setColumnA("");
+    setColumnB("");
     setResult(null);
     setComputeError("");
   }
 
   function handleColumnChange(col) {
     setColumn(col);
+    setResult(null);
+    setComputeError("");
+  }
+
+  function handleColumnAChange(col) {
+    setColumnA(col);
+    setResult(null);
+    setComputeError("");
+  }
+
+  function handleColumnBChange(col) {
+    setColumnB(col);
     setResult(null);
     setComputeError("");
   }
@@ -72,6 +90,9 @@ export default function StatisticsPanel({ datasets }) {
     }
 
     const col = column || activeDataset.numericColumns[0] || "";
+    const bivariateColumnA = columnA || activeDataset.numericColumns[0] || "";
+    const bivariateColumnB =
+      columnB || activeDataset.numericColumns[1] || activeDataset.numericColumns[0] || "";
     if (!col) {
       setComputeError("No numeric column available in this dataset.");
       setResult(null);
@@ -90,6 +111,12 @@ export default function StatisticsPanel({ datasets }) {
       const sampledRows = applySampleMode(filteredRows, sampleMode, { n, seed, start, end });
       const { values, missingCount } = extractNumericValues(sampledRows, col);
       const stats = computeUnivariate(values);
+      const { pairs, excludedCount } = extractNumericPairs(
+        sampledRows,
+        bivariateColumnA,
+        bivariateColumnB
+      );
+      const bivariateStats = computeBivariate(pairs);
 
       setResult({
         datasetName: activeDataset.name,
@@ -97,6 +124,12 @@ export default function StatisticsPanel({ datasets }) {
         filteredN,
         sampledN: sampledRows.length,
         missingCount,
+        bivariate: {
+          columnA: bivariateColumnA,
+          columnB: bivariateColumnB,
+          excludedCount,
+          ...bivariateStats
+        },
         ...stats
       });
       setComputeError("");
@@ -153,6 +186,38 @@ export default function StatisticsPanel({ datasets }) {
                   >
                     {colOptions.length === 0 && (
                       <option value="">— no numeric columns —</option>
+                    )}
+                    {colOptions.map((col) => (
+                      <option key={col} value={col}>{col}</option>
+                    ))}
+                  </select>
+                </label>
+
+                <div className="stats-form-heading">Bivariate statistics</div>
+
+                <label className="field">
+                  <span>Column A</span>
+                  <select
+                    value={columnA || colOptions[0] || ""}
+                    onChange={(e) => handleColumnAChange(e.target.value)}
+                  >
+                    {colOptions.length === 0 && (
+                      <option value="">no numeric columns</option>
+                    )}
+                    {colOptions.map((col) => (
+                      <option key={col} value={col}>{col}</option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="field">
+                  <span>Column B</span>
+                  <select
+                    value={columnB || colOptions[1] || colOptions[0] || ""}
+                    onChange={(e) => handleColumnBChange(e.target.value)}
+                  >
+                    {colOptions.length === 0 && (
+                      <option value="">no numeric columns</option>
                     )}
                     {colOptions.map((col) => (
                       <option key={col} value={col}>{col}</option>
@@ -277,6 +342,54 @@ export default function StatisticsPanel({ datasets }) {
                       </tr>
                     </tbody>
                   </table>
+
+                  {result.bivariate && (
+                    <div className="stat-subsection">
+                      <h3>Bivariate statistics</h3>
+                      <div className="stat-meta">
+                        <span>Column A: <strong>{result.bivariate.columnA}</strong></span>
+                        <span>Column B: <strong>{result.bivariate.columnB}</strong></span>
+                      </div>
+                      <table className="stat-table">
+                        <tbody>
+                          <tr>
+                            <th scope="row">Valid pair count</th>
+                            <td className="stat-value">{result.bivariate.n.toLocaleString()}</td>
+                          </tr>
+                          <tr>
+                            <th scope="row">Excluded pairs</th>
+                            <td className="stat-value">{result.bivariate.excludedCount.toLocaleString()}</td>
+                          </tr>
+                          <tr>
+                            <th scope="row">Covariance (unbiased)</th>
+                            <td className="stat-value">
+                              {result.bivariate.n >= 2 ? formatStatValue(result.bivariate.covariance) : "N/A (n < 2)"}
+                            </td>
+                          </tr>
+                          <tr>
+                            <th scope="row">Pearson correlation</th>
+                            <td className="stat-value">
+                              {result.bivariate.pearson === null
+                                ? result.bivariate.n < 2
+                                  ? "N/A (n < 2)"
+                                  : "N/A (zero variance)"
+                                : formatStatValue(result.bivariate.pearson)}
+                            </td>
+                          </tr>
+                          <tr>
+                            <th scope="row">R squared</th>
+                            <td className="stat-value">
+                              {result.bivariate.rSquared === null
+                                ? result.bivariate.n < 2
+                                  ? "N/A (n < 2)"
+                                  : "N/A (zero variance)"
+                                : formatStatValue(result.bivariate.rSquared)}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               )}
             </>

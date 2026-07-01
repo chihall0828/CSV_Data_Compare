@@ -1135,6 +1135,14 @@ td.num {
   margin-bottom: 14px;
 }
 
+.stats-form-heading {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+  color: #172033;
+  font-size: 14px;
+  font-weight: 800;
+}
+
 .stats-form .primary-button {
   align-self: end;
   grid-column: 1 / -1;
@@ -1161,6 +1169,18 @@ td.num {
 
 .stat-result {
   margin-top: 10px;
+}
+
+.stat-subsection {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #eef1f6;
+}
+
+.stat-subsection h3 {
+  margin: 0 0 10px;
+  color: #172033;
+  font-size: 15px;
 }
 
 .stat-meta {
