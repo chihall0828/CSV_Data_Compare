@@ -43,6 +43,19 @@ import {
 import { compileFormula, evaluateCompiledFormula, formulaHelpText } from "./formulaUtils.js";
 import { parseXlsxWorkbook, rowsToParsedData } from "./xlsxUtils.js";
 import StatisticsPanel from "./StatisticsPanel.jsx";
+import {
+  PLOT_COLOR_CUSTOM,
+  PLOT_COLOR_OPTIONS,
+  PLOT_LINE_STYLE_OPTIONS,
+  isValidHexColor,
+  normalizeHexColor,
+  normalizePlotColor,
+  normalizePlotLineStyle,
+  plotStyleForStorage,
+  plotStyleFromStorage,
+  resolveDatasetColor,
+  resolveDatasetLineDash
+} from "./plotStyleUtils.js";
 
 const APP_NAME = "CSV Data Compare";
 const DISPLAY_SETTINGS_KEY = "csv-data-compare-display-settings";
@@ -339,6 +352,7 @@ function applyStoredDatasetSettings(dataset, storedSettings = readDatasetSetting
   next.rowFilterDraftStart = start ? String(start) : "";
   next.rowFilterDraftEnd = end ? String(end) : "";
   next.enuPreset = saved.enuPreset ?? "";
+  Object.assign(next, plotStyleFromStorage(saved));
   return next;
 }
 
@@ -568,6 +582,7 @@ export default function App() {
     try {
       const stored = {};
       for (const dataset of datasets) {
+        const plotStyle = plotStyleForStorage(dataset);
         stored[datasetSettingsKey(dataset)] = {
           sourceType: dataset.sourceType,
           fileName: dataset.fileName,
@@ -580,6 +595,7 @@ export default function App() {
           visibleGroups: dataset.visibleGroups,
           rowFilter: dataset.rowFilter,
           enuPreset: dataset.enuPreset,
+          ...plotStyle,
           calculatedColumns: dataset.calculatedColumns ?? []
         };
       }
@@ -766,7 +782,9 @@ export default function App() {
         const groups = getGroupEntries(dataset, rows);
 
         groups.forEach((group, groupIndex) => {
-          const color = dataset.groupColumn ? colorForGroupValue(group.value) : colorForIndex(datasetIndex * 17 + groupIndex);
+          const fallbackColor = dataset.groupColumn ? colorForGroupValue(group.value) : colorForIndex(datasetIndex * 17 + groupIndex);
+          const color = resolveDatasetColor(dataset, fallbackColor);
+          const dash = resolveDatasetLineDash(dataset, lineStyle(datasetIndex + groupIndex));
           const points = makeEnuPointsFromRows(group.rows, dataset.eColumn, dataset.nColumn, MAX_POINTS_PER_SERIES);
           if (!points.length) return;
           const traceMeta = {
@@ -785,7 +803,7 @@ export default function App() {
             borderColor: color,
             backgroundColor: `${color}26`,
             borderWidth: lineWidth,
-            borderDash: lineStyle(datasetIndex + groupIndex),
+            borderDash: dash,
             pointRadius: chartType === "scatter" ? markerSize : showPointMarkers ? markerSize : 0,
             pointHoverRadius: Math.max(markerSize + 2, 5),
             showLine: chartType !== "scatter",
@@ -812,7 +830,7 @@ export default function App() {
             fullLabel: fullTraceLabel(endMeta),
             data: [end],
             borderColor: color,
-            backgroundColor: "#111827",
+            backgroundColor: color,
             pointStyle: "rectRot",
             pointRadius: endpointMarkerSize,
             pointHoverRadius: endpointMarkerSize + 2,
@@ -835,9 +853,11 @@ export default function App() {
           const points = makeSeriesPointsFromRows(group.rows, dataset.xColumn, column, xType, MAX_POINTS_PER_SERIES);
           if (!points.length) return;
           if (xType === "category") points.forEach((point) => categoryLabels.add(point.x));
-          const color = dataset.groupColumn
+          const fallbackColor = dataset.groupColumn
             ? colorForGroupValue(group.value)
             : colorForIndex(datasetIndex * Math.max(1, selectedYColumns.length) + columnIndex);
+          const color = resolveDatasetColor(dataset, fallbackColor);
+          const dash = resolveDatasetLineDash(dataset, lineStyle(dataset.groupColumn ? columnIndex : groupIndex + columnIndex));
           const traceMeta = {
             fileName: dataset.name,
             groupColumn: dataset.groupColumn,
@@ -852,7 +872,7 @@ export default function App() {
             borderColor: color,
             backgroundColor: `${color}33`,
             borderWidth: lineWidth,
-            borderDash: lineStyle(dataset.groupColumn ? columnIndex : groupIndex + columnIndex),
+            borderDash: dash,
             pointRadius: chartType === "bar" ? 0 : chartType === "scatter" || showPointMarkers ? markerSize : 0,
             pointHoverRadius: Math.max(markerSize + 2, 5),
             tension: 0.18,
@@ -1313,6 +1333,42 @@ export default function App() {
     updateDataset(id, { groupFilterSearch: value });
   }
 
+  function setDatasetPlotColor(id, value) {
+    const plotColor = normalizePlotColor(value);
+    setDatasets((current) =>
+      current.map((dataset) =>
+        dataset.id === id
+          ? {
+              ...dataset,
+              plotColor,
+              customPlotColorDraft:
+                plotColor === PLOT_COLOR_CUSTOM
+                  ? dataset.customPlotColorDraft ?? dataset.customPlotColor ?? ""
+                  : dataset.customPlotColorDraft ?? ""
+            }
+          : dataset
+      )
+    );
+  }
+
+  function setDatasetCustomPlotColor(id, value) {
+    setDatasets((current) =>
+      current.map((dataset) =>
+        dataset.id === id
+          ? {
+              ...dataset,
+              customPlotColorDraft: value,
+              customPlotColor: normalizeHexColor(value)
+            }
+          : dataset
+      )
+    );
+  }
+
+  function setDatasetPlotLineStyle(id, value) {
+    updateDataset(id, { plotLineStyle: normalizePlotLineStyle(value) });
+  }
+
   function updateRowFilterDraft(id, patch) {
     setDatasets((current) =>
       current.map((dataset) => (dataset.id === id ? { ...dataset, ...patch } : dataset))
@@ -1404,7 +1460,11 @@ export default function App() {
         rowFilter: { start: null, end: null },
         rowFilterDraftStart: "",
         rowFilterDraftEnd: "",
-        enuPreset: ""
+        enuPreset: "",
+        plotColor: "auto",
+        customPlotColor: "",
+        customPlotColorDraft: "",
+        plotLineStyle: "auto"
       }))
     );
     setMessages([{ type: "success", text: "Display settings were reset." }]);
@@ -1458,6 +1518,7 @@ export default function App() {
             visibleGroups: dataset.visibleGroups,
             rowFilter: dataset.rowFilter,
             enuPreset: dataset.enuPreset,
+            ...plotStyleForStorage(dataset),
             calculatedColumns: dataset.calculatedColumns ?? []
           }
         ])
@@ -1904,6 +1965,14 @@ export default function App() {
                 const filteredGroupValues = (diagnostic?.groupValues ?? [])
                   .filter((item) => !groupSearch || cleanHeader(item.value).toLowerCase().includes(groupSearch))
                   .slice(0, MAX_GROUP_CHECKBOXES);
+                const plotColorValue = normalizePlotColor(dataset.plotColor);
+                const customPlotColorDraft = dataset.customPlotColorDraft ?? dataset.customPlotColor ?? "";
+                const customPlotColorInvalid =
+                  plotColorValue === PLOT_COLOR_CUSTOM &&
+                  Boolean(customPlotColorDraft) &&
+                  !isValidHexColor(customPlotColorDraft);
+                const plotLineStyleValue = normalizePlotLineStyle(dataset.plotLineStyle);
+                const plotPreviewColor = resolveDatasetColor(dataset, dataset.color);
                 return (
                 <article className="dataset-card" key={dataset.id}>
                   <div className="dataset-main">
@@ -1995,6 +2064,57 @@ export default function App() {
                       <option value="relative">{ENU_PRESETS.relative.label}</option>
                     </select>
                   </label>
+                  <div className="plot-style-controls">
+                    <div className="plot-style-head">
+                      <span>Plot style</span>
+                      <span className={`plot-style-preview line-${plotLineStyleValue}`} aria-hidden="true">
+                        <span className="plot-style-swatch" style={{ background: plotPreviewColor }} />
+                        <span className="plot-style-line" style={{ borderTopColor: plotPreviewColor }} />
+                      </span>
+                    </div>
+                    <div className="plot-style-grid">
+                      <label>
+                        Color
+                        <select
+                          value={plotColorValue}
+                          onChange={(event) => setDatasetPlotColor(dataset.id, event.target.value)}
+                        >
+                          {PLOT_COLOR_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>{option.label}</option>
+                          ))}
+                        </select>
+                      </label>
+                      {plotColorValue === PLOT_COLOR_CUSTOM && (
+                        <label>
+                          Custom hex
+                          <input
+                            type="text"
+                            inputMode="text"
+                            maxLength="7"
+                            pattern="#[0-9A-Fa-f]{6}"
+                            placeholder="#2563EB"
+                            value={customPlotColorDraft}
+                            onChange={(event) => setDatasetCustomPlotColor(dataset.id, event.target.value)}
+                            aria-invalid={customPlotColorInvalid}
+                          />
+                        </label>
+                      )}
+                      <label>
+                        Line style
+                        <select
+                          value={plotLineStyleValue}
+                          onChange={(event) => setDatasetPlotLineStyle(dataset.id, event.target.value)}
+                        >
+                          {PLOT_LINE_STYLE_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>{option.label}</option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                    {customPlotColorInvalid && (
+                      <p className="field-note">Custom hex must use #RRGGBB. Invalid values are not saved or applied.</p>
+                    )}
+                  </div>
                   <label className="preset-row">
                     Group / Split column
                     <select value={dataset.groupColumn} onChange={(event) => setDatasetGroupColumn(dataset.id, event.target.value)}>

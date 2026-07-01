@@ -159,6 +159,13 @@ sqrt(([KF_E_m] - [Relative_E_m])^2 + ([KF_N_m] - [Relative_N_m])^2)
 - `Marker size`: 点マーカーの大きさを変更します。初期値は5です。
 - `Start/end marker`: XY Plotの開始点・終了点マーカーの大きさを変更します。初期値は9です。
 
+読み込み済みファイルカードの **Plot style** では、データセットごとに色と線種を指定できます。
+
+- `Color`: `Auto`, `Blue`, `Red`, `Green`, `Purple`, `Orange`, `Cyan`, `Gray`, `Custom hex` から選びます。
+- `Custom hex`: `#RRGGBB` 形式だけ使えます。不正な値は保存・適用されません。
+- `Line style`: `Auto`, `Solid`, `Dashed`, `Dotted`, `Dash-dot` から選びます。
+- `Auto` の場合は従来通り、ファイル順や `Group / Split column` のグループ値から自動で色・線種を決めます。
+
 点を表示すると、大きいCSVでは描画が重くなる場合があります。重い場合は `Markers` をOffにするか、表示するCSVやY列を減らしてください。
 
 これらの設定と等倍スケール設定はブラウザに保存され、次回起動時にも復元されます。
@@ -424,6 +431,8 @@ CompactやHiddenでも、グラフ上の点や線にマウスを重ねるとtool
 
 `Group / Split column` を使う場合、同じグループ値からハッシュを作って色を決めます。そのため、`normal` や `block_az0_60_ele70` など同じグループ値は、再読み込み後も同じ色になりやすくなっています。Time Series Plotではグループを色で固定し、E/N/Uなどの列は線種と凡例で区別する方針です。
 
+ファイルカードの **Plot style** でColorを明示指定した場合は、グループ色よりもデータセット指定色を優先します。Colorが`Auto`なら従来通りグループごとの色分けを維持します。Line styleも`Auto`なら従来の自動線種を使い、明示指定した場合はTime Series PlotとXY Plotに反映されます。XY PlotのStart/End markerとPNG保存にも同じ設定が反映されます。
+
 ### グループフィルタ
 
 グループフィルタには以下の操作があります。
@@ -455,6 +464,7 @@ CompactやHiddenでも、グラフ上の点や線にマウスを重ねるとtool
 - Group / Split column
 - 表示ON/OFF中のグループ
 - Row filter
+- データセットごとのPlot style（Color、Custom hex、Line style）
 - 線幅、Markers、Marker size、Start/end marker size
 - Equal scale
 - グラフタイトル、軸ラベル、表示範囲
