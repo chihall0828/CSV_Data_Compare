@@ -1206,3 +1206,67 @@ td.num {
   border-bottom: 0;
 }
 
+
+/* ── Hypothesis Test Section ─────────────────────────────────────────── */
+
+.hyp-section {
+  border-top: 1px solid #d1d5db;
+  margin-top: 1.25rem;
+  padding-top: 0.75rem;
+}
+
+.hyp-toggle {
+  all: unset;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #374151;
+  padding: 0.25rem 0;
+  box-sizing: border-box;
+}
+
+.hyp-toggle:hover { color: #1d4ed8; }
+
+.hyp-toggle-title { flex: 1; }
+
+.hyp-body { margin-top: 0.75rem; }
+
+.hyp-sample-fieldset {
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.hyp-sample-fieldset legend {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #6b7280;
+  padding: 0 0.25rem;
+}
+
+.hyp-result { margin-top: 1rem; }
+
+.hyp-significant {
+  font-weight: 700;
+  color: #059669;
+}
+
+.hyp-not-significant {
+  font-weight: 700;
+  color: #b45309;
+}
+
+.hyp-cautions {
+  margin: 0.75rem 0 0;
+  padding-left: 1.25rem;
+  font-size: 0.78rem;
+  color: #6b7280;
+  line-height: 1.6;
+}
+
+.hyp-cautions li { margin-bottom: 0.2rem; }

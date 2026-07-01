@@ -7,6 +7,7 @@ import {
   applySampleMode,
   formatStatValue
 } from "./statisticsUtils.js";
+import HypothesisTestSection from "./HypothesisTestSection.jsx";
 
 const SAMPLE_MODES = [
   { value: "all", label: "All filtered rows" },
@@ -281,6 +282,7 @@ export default function StatisticsPanel({ datasets }) {
               )}
             </>
           )}
+          <HypothesisTestSection datasets={datasets} />
         </div>
       )}
     </section>
