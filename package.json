@@ -10,6 +10,9 @@
     "build:portable": "vite build",
     "preview": "vite preview",
     "generate:test-samples": "node scripts/generate-test-samples.mjs",
+    "validate": "npm run validate:statistics && npm run validate:plot-style && npm run validate:real && npm run validate:excel",
+    "validate:statistics": "node scripts/validate-statistics.mjs",
+    "validate:plot-style": "node scripts/validate-plot-style.mjs",
     "validate:real": "node scripts/validate-real-data.mjs",
     "validate:excel": "node scripts/validate-excel-and-calculation.mjs",
     "package:portable": "powershell -ExecutionPolicy Bypass -File scripts/create-portable-package.ps1"
