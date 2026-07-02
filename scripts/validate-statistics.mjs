@@ -238,6 +238,8 @@ assert(r4.significant, "pairedT: should be significant at alpha=0.05");
 // Unequal lengths must return error
 const r4e = runPairedT([1, 2, 3], [1, 2]);
 assert(r4e.error, "pairedT: should error on unequal lengths");
+const r4z = runPairedT([2, 3, 4], [1, 2, 3], "two-sided", 0.05);
+assert(r4z.error, "pairedT: should error when paired differences have zero variance");
 
 // F-test: A=[1,2,3,4,5] varA=2.5, B=[2,4,6,8,10] varB=10, F=0.25, df1=df2=4, p≈0.208
 const r5 = runFTest([1, 2, 3, 4, 5], [2, 4, 6, 8, 10], "two-sided", 0.05);
@@ -259,6 +261,19 @@ assert(nearlyEqual(r6.effectSize, 0.81, 1e-6), `corrTest r²: expected 0.81, got
 // Unequal lengths must return error
 const r6e = runCorrelationTest([1, 2, 3], [1, 2]);
 assert(r6e.error, "corrTest: should error on unequal lengths");
+const r6PerfectGreater = runCorrelationTest([1, 2, 3], [1, 2, 3], "greater", 0.05);
+assert(!r6PerfectGreater.error, `corrTest perfect positive greater: unexpected error: ${r6PerfectGreater.error}`);
+assert(nearlyEqual(r6PerfectGreater.pValue, 0), `corrTest perfect positive greater: expected p=0, got ${r6PerfectGreater.pValue}`);
+assert(r6PerfectGreater.significant, "corrTest perfect positive greater: should be significant");
+const r6PerfectLess = runCorrelationTest([1, 2, 3], [1, 2, 3], "less", 0.05);
+assert(nearlyEqual(r6PerfectLess.pValue, 1), `corrTest perfect positive less: expected p=1, got ${r6PerfectLess.pValue}`);
+assert(!r6PerfectLess.significant, "corrTest perfect positive less: should not be significant");
+const r6PerfectNegativeGreater = runCorrelationTest([1, 2, 3], [3, 2, 1], "greater", 0.05);
+assert(nearlyEqual(r6PerfectNegativeGreater.pValue, 1), `corrTest perfect negative greater: expected p=1, got ${r6PerfectNegativeGreater.pValue}`);
+assert(!r6PerfectNegativeGreater.significant, "corrTest perfect negative greater: should not be significant");
+const r6PerfectNegativeLess = runCorrelationTest([1, 2, 3], [3, 2, 1], "less", 0.05);
+assert(nearlyEqual(r6PerfectNegativeLess.pValue, 0), `corrTest perfect negative less: expected p=0, got ${r6PerfectNegativeLess.pValue}`);
+assert(r6PerfectNegativeLess.significant, "corrTest perfect negative less: should be significant");
 
 // Paired/correlation values must preserve row pairs when gaps occur in different rows.
 const gappedPairRows = [
