@@ -32,6 +32,30 @@ function Resolve-NodePath {
   throw "Node.js was not found. Install Node.js, add it to PATH, or pass -NodePath to this script."
 }
 
+function Invoke-WithRetry {
+  param(
+    [Parameter(Mandatory = $true)]
+    [scriptblock]$Script,
+    [Parameter(Mandatory = $true)]
+    [string]$Description,
+    [int]$Attempts = 5,
+    [int]$DelayMilliseconds = 500
+  )
+
+  for ($attempt = 1; $attempt -le $Attempts; $attempt++) {
+    try {
+      & $Script
+      return
+    } catch {
+      if ($attempt -eq $Attempts) {
+        throw "$Description failed after $Attempts attempts. Last error: $($_.Exception.Message)"
+      }
+
+      Start-Sleep -Milliseconds ($DelayMilliseconds * $attempt)
+    }
+  }
+}
+
 if (-not $SkipBuild) {
   $resolvedNode = Resolve-NodePath -ExplicitPath $NodePath
   $viteCli = Join-Path $projectRoot "node_modules\vite\bin\vite.js"
@@ -44,7 +68,9 @@ if (-not $SkipBuild) {
     if (-not $resolvedDist.StartsWith($projectRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
       throw "Refusing to remove dist outside the project: $resolvedDist"
     }
-    Remove-Item -LiteralPath $resolvedDist -Recurse -Force
+    Invoke-WithRetry -Description "Remove dist folder" -Script {
+      Remove-Item -LiteralPath $resolvedDist -Recurse -Force
+    }
   }
 
   Push-Location $projectRoot
@@ -67,14 +93,24 @@ if (Test-Path -LiteralPath $packageRoot) {
   if (-not $resolvedPackage.StartsWith($projectRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
     throw "Refusing to remove a folder outside the project: $resolvedPackage"
   }
-  Remove-Item -LiteralPath $resolvedPackage -Recurse -Force
+  Invoke-WithRetry -Description "Remove portable package folder" -Script {
+    Remove-Item -LiteralPath $resolvedPackage -Recurse -Force
+  }
 }
 
 New-Item -ItemType Directory -Force -Path $appRoot | Out-Null
-Copy-Item -Path (Join-Path $distRoot "*") -Destination $appRoot -Recurse -Force
-Copy-Item -LiteralPath (Join-Path $PSScriptRoot "portable-server.ps1") -Destination (Join-Path $packageRoot "server.ps1") -Force
-Copy-Item -LiteralPath (Join-Path $PSScriptRoot "start-portable.bat") -Destination (Join-Path $packageRoot "Start CSV Data Compare.bat") -Force
-Copy-Item -LiteralPath (Join-Path $projectRoot "README.md") -Destination (Join-Path $packageRoot "README.md") -Force
+Invoke-WithRetry -Description "Copy app files" -Script {
+  Copy-Item -Path (Join-Path $distRoot "*") -Destination $appRoot -Recurse -Force
+}
+Invoke-WithRetry -Description "Copy portable server" -Script {
+  Copy-Item -LiteralPath (Join-Path $PSScriptRoot "portable-server.ps1") -Destination (Join-Path $packageRoot "server.ps1") -Force
+}
+Invoke-WithRetry -Description "Copy portable launcher" -Script {
+  Copy-Item -LiteralPath (Join-Path $PSScriptRoot "start-portable.bat") -Destination (Join-Path $packageRoot "Start CSV Data Compare.bat") -Force
+}
+Invoke-WithRetry -Description "Copy README" -Script {
+  Copy-Item -LiteralPath (Join-Path $projectRoot "README.md") -Destination (Join-Path $packageRoot "README.md") -Force
+}
 
 $assetFiles = @()
 $assetRoot = Join-Path $appRoot "assets"
@@ -89,9 +125,12 @@ $buildInfo = [ordered]@{
   distIndexHash = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $appRoot "index.html")).Hash
   assets = $assetFiles
 }
-$buildInfo | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $appRoot "build-info.json") -Encoding UTF8
+Invoke-WithRetry -Description "Write build-info.json" -Script {
+  $buildInfo | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $appRoot "build-info.json") -Encoding UTF8
+}
 
-@"
+Invoke-WithRetry -Description "Write portable README.txt" -Script {
+  @"
 CSV Data Compare Portable
 
 How to start:
@@ -102,16 +141,24 @@ How to start:
 
 This portable package does not require Node.js or npm.
 "@ | Set-Content -LiteralPath (Join-Path $packageRoot "README.txt") -Encoding UTF8
+}
 
 if (Test-Path -LiteralPath $zipPath) {
   $resolvedZip = (Resolve-Path -LiteralPath $zipPath).Path
   if (-not $resolvedZip.StartsWith($releaseRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
     throw "Refusing to remove a zip outside the release folder: $resolvedZip"
   }
-  Remove-Item -LiteralPath $resolvedZip -Force
+  Invoke-WithRetry -Description "Remove portable zip" -Script {
+    Remove-Item -LiteralPath $resolvedZip -Force
+  }
 }
 
-Compress-Archive -LiteralPath $packageRoot -DestinationPath $zipPath -Force
+Invoke-WithRetry -Description "Create portable zip" -Script {
+  if (Test-Path -LiteralPath $zipPath) {
+    Remove-Item -LiteralPath $zipPath -Force
+  }
+  Compress-Archive -LiteralPath $packageRoot -DestinationPath $zipPath -Force
+}
 
 Write-Host "Portable folder: $packageRoot" -ForegroundColor Green
 Write-Host "Portable zip: $zipPath" -ForegroundColor Green
