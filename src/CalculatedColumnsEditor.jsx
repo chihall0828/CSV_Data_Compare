@@ -1,20 +1,12 @@
+import { useRef, useState } from "react";
 import { cleanHeader } from "./dataUtils.js";
 import { compileFormula, evaluateCompiledFormula, formulaHelpText } from "./formulaUtils.js";
+import { HelpButton, HelpDialog } from "./HelpDialog.jsx";
+import { FormulaHelpContent } from "./statisticsHelpContent.jsx";
 
 const OPERATOR_SNIPPETS = ["+", "-", "*", "/", "^", "(", ")"];
 
-const FUNCTION_SNIPPETS = [
-  { label: "sqrt()", snippet: "sqrt(" },
-  { label: "abs()", snippet: "abs(" },
-  { label: "pow()", snippet: "pow(" },
-  { label: "min()", snippet: "min(" },
-  { label: "max()", snippet: "max(" },
-  { label: "sin()", snippet: "sin(" },
-  { label: "cos()", snippet: "cos(" },
-  { label: "tan()", snippet: "tan(" },
-  { label: "log()", snippet: "log(" },
-  { label: "exp()", snippet: "exp(" }
-];
+const FUNCTION_NAMES = ["sqrt", "abs", "pow", "min", "max", "sin", "cos", "tan", "log", "exp"];
 
 const PREVIEW_ROW_COUNT = 5;
 const MAX_COLUMN_BUTTONS = 80;
@@ -54,11 +46,26 @@ export default function CalculatedColumnsEditor({ dataset, onDraftChange, onAdd,
   const trimmedFormula = cleanHeader(formula);
   const preview = buildPreview(dataset, trimmedFormula);
   const examples = buildExamples(dataset.numericColumns);
+  const textareaRef = useRef(null);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const helpDialogId = `formula-help-${dataset.id}`;
 
-  function appendSnippet(snippet) {
+  // Insert at the textarea cursor (replacing any selection); cursorOffset
+  // positions the caret within the snippet, e.g. inside "sqrt()".
+  function insertSnippet(snippet, cursorOffset = snippet.length) {
     const current = dataset.calculationFormula ?? "";
-    const separator = current && !/[\s(]$/.test(current) ? " " : "";
-    onDraftChange({ calculationFormula: `${current}${separator}${snippet}` });
+    const textarea = textareaRef.current;
+    const start = textarea ? textarea.selectionStart : current.length;
+    const end = textarea ? textarea.selectionEnd : current.length;
+    const next = current.slice(0, start) + snippet + current.slice(end);
+    onDraftChange({ calculationFormula: next });
+    const caret = start + cursorOffset;
+    requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(caret, caret);
+    });
   }
 
   return (
@@ -79,10 +86,27 @@ export default function CalculatedColumnsEditor({ dataset, onDraftChange, onAdd,
       </div>
 
       <div className="calc-block">
-        <div className="calc-block-title">2. Formula builder</div>
+        <div className="calc-block-title calc-block-title-row">
+          2. Formula builder
+          <HelpButton
+            open={helpOpen}
+            onToggle={() => setHelpOpen((v) => !v)}
+            dialogId={helpDialogId}
+            label="Formulaの書き方ヘルプを開く"
+          />
+        </div>
+        <HelpDialog
+          open={helpOpen}
+          onClose={() => setHelpOpen(false)}
+          dialogId={helpDialogId}
+          title="Formulaの書き方"
+        >
+          <FormulaHelpContent />
+        </HelpDialog>
         <label className="formula-field">
           Formula
           <textarea
+            ref={textareaRef}
             value={formula}
             onChange={(event) => onDraftChange({ calculationFormula: event.target.value })}
             placeholder="sqrt(([KF_E_m] - [Relative_E_m])^2 + ([KF_N_m] - [Relative_N_m])^2)"
@@ -96,7 +120,7 @@ export default function CalculatedColumnsEditor({ dataset, onDraftChange, onAdd,
           <span className="calc-toolbar-label">Insert column</span>
           <div className="column-insert-list" aria-label="Insert column reference">
             {dataset.columns.slice(0, MAX_COLUMN_BUTTONS).map((column) => (
-              <button type="button" key={column} onClick={() => appendSnippet(`[${column}]`)}>
+              <button type="button" key={column} onClick={() => insertSnippet(`[${column}]`)}>
                 [{column}]
               </button>
             ))}
@@ -106,7 +130,7 @@ export default function CalculatedColumnsEditor({ dataset, onDraftChange, onAdd,
           <span className="calc-toolbar-label">Operators</span>
           <div className="column-insert-list calc-operator-list" aria-label="Insert operator">
             {OPERATOR_SNIPPETS.map((operator) => (
-              <button type="button" key={operator} onClick={() => appendSnippet(operator)}>
+              <button type="button" key={operator} onClick={() => insertSnippet(operator)}>
                 {operator}
               </button>
             ))}
@@ -115,9 +139,13 @@ export default function CalculatedColumnsEditor({ dataset, onDraftChange, onAdd,
         <div className="calc-toolbar">
           <span className="calc-toolbar-label">Functions</span>
           <div className="column-insert-list calc-operator-list" aria-label="Insert function">
-            {FUNCTION_SNIPPETS.map((item) => (
-              <button type="button" key={item.label} onClick={() => appendSnippet(item.snippet)}>
-                {item.label}
+            {FUNCTION_NAMES.map((name) => (
+              <button
+                type="button"
+                key={name}
+                onClick={() => insertSnippet(`${name}()`, name.length + 1)}
+              >
+                {name}()
               </button>
             ))}
           </div>
@@ -158,7 +186,10 @@ export default function CalculatedColumnsEditor({ dataset, onDraftChange, onAdd,
       {examples.length > 0 && (
         <div className="calc-block">
           <div className="calc-block-title">4. Examples</div>
-          <p className="field-note">クリックするとFormula欄に式がセットされます。</p>
+          <p className="field-note">
+            クリックするとFormula欄に式がセットされます。Examplesは現在のデータセットの数値列を使って作られます。
+            意図と違う列名が入った場合は、Insert columnの列ボタンで置き換えてください。
+          </p>
           <div className="calc-examples">
             {examples.map((example) => (
               <button

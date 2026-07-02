@@ -89,6 +89,47 @@ export function BivariateHelpContent() {
   );
 }
 
+export function FormulaHelpContent() {
+  return (
+    <>
+      <h4>Formulaとは</h4>
+      <p>
+        既存の列の値から新しい列を計算するための式です。行ごとに式が評価され、
+        結果が新しい列としてデータに追加されます。
+      </p>
+
+      <h4>列の参照方法</h4>
+      <ul>
+        <li>列名は <code>[Column name]</code> のように角括弧で囲んで参照します。</li>
+        <li>例: <code>sqrt([E_m]^2 + [N_m]^2)</code></li>
+      </ul>
+
+      <h4>使える演算子</h4>
+      <p>
+        <code>+</code> <code>-</code> <code>*</code> <code>/</code> <code>^</code>（べき乗） <code>( )</code>（括弧）
+      </p>
+
+      <h4>使える関数</h4>
+      <p>
+        <code>sqrt</code> <code>abs</code> <code>pow</code> <code>min</code> <code>max</code>{" "}
+        <code>sin</code> <code>cos</code> <code>tan</code> <code>log</code> <code>exp</code>
+      </p>
+
+      <h4>計算できない行の扱い</h4>
+      <ul>
+        <li>欠損値・非数値・0除算・無限大になる行は、計算不能行としてスキップされ空欄になります。</li>
+        <li>スキップされた行数は列追加後に「skipped」として表示されます。</li>
+      </ul>
+
+      <h4>データへの影響</h4>
+      <ul>
+        <li>元のCSV/Excelファイルは変更されません。計算列はアプリ内の一時列として追加されます。</li>
+        <li><strong>Export processed CSV</strong> を使うと、計算列を含めたCSVを書き出せます。</li>
+      </ul>
+    </>
+  );
+}
+
 export function HypothesisHelpContent() {
   return (
     <>
