@@ -12,6 +12,16 @@ function nearlyEqual(actual, expected, tolerance = 1e-9) {
   return Math.abs(actual - expected) <= tolerance;
 }
 
+function assertThrows(fn, message) {
+  let threw = false;
+  try {
+    fn();
+  } catch {
+    threw = true;
+  }
+  assert(threw, message);
+}
+
 async function readWorkbook(filePath) {
   const buffer = fs.readFileSync(filePath);
   const arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
@@ -83,6 +93,38 @@ assert(threeD.invalidCount === 2, "3D error should skip non-numeric and missing 
 const divisionByZero = applyFormula(calculationDataset.rows, calculationDataset.columns, "[KF_E_m] / 0");
 assert(divisionByZero.invalidCount === calculationDataset.rowCount, "Division by zero should produce invalid results.");
 
+const caseInsensitive = applyFormula(
+  calculationDataset.rows,
+  calculationDataset.columns,
+  "[kf_e_m] - [relative_e_m]"
+);
+assert(caseInsensitive.referencedColumns.includes("KF_E_m"), "Formula should resolve case-insensitive column references to real columns.");
+assert(nearlyEqual(caseInsensitive.values[0], 0.2), "Case-insensitive formula row 1 should be 0.2.");
+
+const functions = applyFormula(
+  calculationDataset.rows,
+  calculationDataset.columns,
+  "max(abs([KF_E_m] - [Relative_E_m]), pow([KF_N_m] - [Relative_N_m], 2))"
+);
+assert(nearlyEqual(functions.values[0], 0.2), "Formula functions should evaluate nested abs/max/pow calls.");
+
+assertThrows(
+  () => compileFormula("", calculationDataset.columns),
+  "Empty formula should be rejected."
+);
+assertThrows(
+  () => compileFormula("[Missing_column]", calculationDataset.columns),
+  "Missing formula column should be rejected."
+);
+assertThrows(
+  () => compileFormula("sqrt()", calculationDataset.columns),
+  "Function calls with too few arguments should be rejected."
+);
+assertThrows(
+  () => compileFormula("[KF_E_m] +", calculationDataset.columns),
+  "Incomplete formulas should be rejected."
+);
+
 console.log(
   JSON.stringify(
     {
@@ -115,6 +157,11 @@ console.log(
           divisionByZero: {
             validCount: divisionByZero.validCount,
             invalidCount: divisionByZero.invalidCount
+          },
+          functions: {
+            validCount: functions.validCount,
+            invalidCount: functions.invalidCount,
+            firstValue: functions.values[0]
           }
         }
       },
