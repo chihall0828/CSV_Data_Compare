@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { applyRowFilter } from "./dataUtils.js";
-import { extractNumericValues, formatStatValue } from "./statisticsUtils.js";
+import { extractNumericPairs, extractNumericValues, formatStatValue } from "./statisticsUtils.js";
 import {
   runOneSampleT,
   runIndependentT,
@@ -116,7 +116,7 @@ export default function HypothesisTestSection({ datasets }) {
     ? Math.max(0.0001, Math.min(0.9999, parseFloat(alphaCustom) || 0.05))
     : parseFloat(alphaPreset);
 
-  function getValues(datasetId, column, groupCol, groupVal) {
+  function getSampleSelection(datasetId, column, groupCol, groupVal) {
     const ds = (datasetId ? datasets.find(d => d.id === datasetId) : null) ?? datasets[0];
     if (!ds) throw new Error("Dataset not found.");
     let rows = applyRowFilter(ds.rows, ds.rowFilter);
@@ -125,8 +125,31 @@ export default function HypothesisTestSection({ datasets }) {
     }
     const col = column || ds.numericColumns[0] || "";
     if (!col) throw new Error("No numeric column available.");
+    return { ds, rows, col };
+  }
+
+  function getValues(datasetId, column, groupCol, groupVal) {
+    const { rows, col } = getSampleSelection(datasetId, column, groupCol, groupVal);
     const { values } = extractNumericValues(rows, col);
     return values;
+  }
+
+  function getPairedValues() {
+    const a = getSampleSelection(aDatasetId, aColumn, aGroupCol, aGroupVal);
+    const b = getSampleSelection(bDatasetId, bColumn, bGroupCol, bGroupVal);
+    if (a.ds.id !== b.ds.id) {
+      throw new Error("Paired tests and correlation require Sample A and Sample B from the same dataset.");
+    }
+    const sameRows =
+      a.rows.length === b.rows.length && a.rows.every((row, index) => row === b.rows[index]);
+    if (!sameRows) {
+      throw new Error("Paired tests and correlation require the same filtered rows for Sample A and Sample B.");
+    }
+    const { pairs } = extractNumericPairs(a.rows, a.col, b.col);
+    return {
+      aVals: pairs.map(([aValue]) => aValue),
+      bVals: pairs.map(([, bValue]) => bValue)
+    };
   }
 
   function handleRun() {
@@ -140,12 +163,16 @@ export default function HypothesisTestSection({ datasets }) {
         if (!Number.isFinite(mu)) throw new Error("μ₀ must be a number.");
         res = runOneSampleT(aVals, mu, alternative, alpha);
       } else {
-        const bVals = getValues(bDatasetId, bColumn, bGroupCol, bGroupVal);
+        const paired = testType === "paired_t" || testType === "correlation"
+          ? getPairedValues()
+          : null;
+        const bVals = paired?.bVals ?? getValues(bDatasetId, bColumn, bGroupCol, bGroupVal);
+        const effectiveAVals = paired?.aVals ?? aVals;
         if (testType === "independent_t") res = runIndependentT(aVals, bVals, alternative, alpha);
         else if (testType === "welch_t") res = runWelchT(aVals, bVals, alternative, alpha);
-        else if (testType === "paired_t") res = runPairedT(aVals, bVals, alternative, alpha);
+        else if (testType === "paired_t") res = runPairedT(effectiveAVals, bVals, alternative, alpha);
         else if (testType === "f_test") res = runFTest(aVals, bVals, alternative, alpha);
-        else if (testType === "correlation") res = runCorrelationTest(aVals, bVals, alternative, alpha);
+        else if (testType === "correlation") res = runCorrelationTest(effectiveAVals, bVals, alternative, alpha);
       }
       if (res?.error) { setRunError(res.error); return; }
       setResult(res);

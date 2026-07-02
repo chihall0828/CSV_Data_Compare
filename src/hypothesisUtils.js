@@ -49,6 +49,9 @@ export function runOneSampleT(values, mu0, alternative = "two-sided", alpha = 0.
   const s = sampleStats(values);
   if (!s || s.n < 2) return { error: "Need at least 2 values." };
   const { n, mean, variance } = s;
+  if (!Number.isFinite(variance) || variance <= 0) {
+    return { error: "One-sample t-test requires non-zero sample variance." };
+  }
   const t = (mean - mu0) / Math.sqrt(variance / n);
   const df = n - 1;
   return {

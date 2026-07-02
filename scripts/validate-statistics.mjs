@@ -204,6 +204,10 @@ assert(!r1.significant, "oneSampleT: should not be significant at alpha=0.05");
 const r1b = runOneSampleT([2, 3, 4, 5, 6], 4, "two-sided", 0.05);
 assert(nearlyEqual(r1b.statistic, 0, 1e-10), `oneSampleT t==0: expected 0, got ${r1b.statistic}`);
 assert(nearlyEqual(r1b.pValue, 1.0, 1e-6), `oneSampleT p==1: expected 1.0, got ${r1b.pValue}`);
+const r1c = runOneSampleT([5, 5, 5], 5, "two-sided", 0.05);
+assert(r1c.error, "oneSampleT: should error when sample variance is zero and mean equals mu0");
+const r1d = runOneSampleT([5, 5, 5], 4, "two-sided", 0.05);
+assert(r1d.error, "oneSampleT: should error when sample variance is zero and mean differs from mu0");
 
 // Independent t-test: A=[1,2,3,4,5] B=[3,4,5,6,7], p≈0.0805
 const r2 = runIndependentT([1, 2, 3, 4, 5], [3, 4, 5, 6, 7], "two-sided", 0.05);
@@ -255,6 +259,34 @@ assert(nearlyEqual(r6.effectSize, 0.81, 1e-6), `corrTest r²: expected 0.81, got
 // Unequal lengths must return error
 const r6e = runCorrelationTest([1, 2, 3], [1, 2]);
 assert(r6e.error, "corrTest: should error on unequal lengths");
+
+// Paired/correlation values must preserve row pairs when gaps occur in different rows.
+const gappedPairRows = [
+  { a: "1", b: "2" },
+  { a: "", b: "999" },
+  { a: "2", b: "4" },
+  { a: "999", b: "" },
+  { a: "3", b: "6" }
+];
+const separateA = extractNumericValues(gappedPairRows, "a").values;
+const separateB = extractNumericValues(gappedPairRows, "b").values;
+assert(separateA.length === 4 && separateB.length === 4, "gapped pairs sanity: separate extraction stays length 4");
+const alignedPairs = extractNumericPairs(gappedPairRows, "a", "b").pairs;
+assert(alignedPairs.length === 3, `aligned pairs: expected 3, got ${alignedPairs.length}`);
+assert(
+  JSON.stringify(alignedPairs) === JSON.stringify([[1, 2], [2, 4], [3, 6]]),
+  `aligned pairs: unexpected pairs ${JSON.stringify(alignedPairs)}`
+);
+const alignedA = alignedPairs.map(([a]) => a);
+const alignedB = alignedPairs.map(([, b]) => b);
+const r4Aligned = runPairedT(alignedA, alignedB, "two-sided", 0.05);
+assert(!r4Aligned.error, `pairedT aligned gaps: unexpected error: ${r4Aligned.error}`);
+assert(r4Aligned.nA === 3, `pairedT aligned gaps n: expected 3, got ${r4Aligned.nA}`);
+assert(nearlyEqual(r4Aligned.meanDiff, -2), `pairedT aligned gaps meanDiff: expected -2, got ${r4Aligned.meanDiff}`);
+const r6Aligned = runCorrelationTest(alignedA, alignedB, "two-sided", 0.05);
+assert(!r6Aligned.error, `corrTest aligned gaps: unexpected error: ${r6Aligned.error}`);
+assert(r6Aligned.nA === 3, `corrTest aligned gaps n: expected 3, got ${r6Aligned.nA}`);
+assert(nearlyEqual(r6Aligned.statistic, 1, 1e-10), `corrTest aligned gaps r: expected 1, got ${r6Aligned.statistic}`);
 
 // ---- report ----
 
