@@ -15,6 +15,7 @@
     "validate:plot-style": "node scripts/validate-plot-style.mjs",
     "validate:real": "node scripts/validate-real-data.mjs",
     "validate:excel": "node scripts/validate-excel-and-calculation.mjs",
+    "validate:pages-build": "node scripts/validate-pages-build.mjs",
     "validate:portable-release": "node scripts/validate-portable-release.mjs",
     "package:portable": "powershell -ExecutionPolicy Bypass -File scripts/create-portable-package.ps1"
   },

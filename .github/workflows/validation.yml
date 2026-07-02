@@ -37,5 +37,10 @@ jobs:
         env:
           VITE_BASE_URL: /${{ github.event.repository.name }}/
 
+      - name: Validate GitHub Pages build output
+        run: npm run validate:pages-build
+        env:
+          VITE_BASE_URL: /${{ github.event.repository.name }}/
+
       - name: Build portable bundle
         run: npm run build:portable
