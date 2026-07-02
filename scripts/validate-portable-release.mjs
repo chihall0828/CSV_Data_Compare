@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 
 const releaseDir = path.resolve("release", "CSVDataCompare");
 const zipPath = path.resolve("release", "CSVDataCompare-portable.zip");
@@ -11,6 +12,10 @@ function assert(condition, message) {
 
 function normalizeZipPath(name) {
   return name.replace(/\\/g, "/").replace(/\/+$/u, "");
+}
+
+function sha256Hex(filePath) {
+  return crypto.createHash("sha256").update(fs.readFileSync(filePath)).digest("hex").toUpperCase();
 }
 
 function listFiles(root, current = root) {
@@ -94,6 +99,7 @@ assert(buildInfo.app === "CSV Data Compare", `Unexpected app name in build-info.
 assert(buildInfo.packageName === "CSVDataCompare", `Unexpected package name in build-info.json: ${buildInfo.packageName}`);
 assert(Array.isArray(buildInfo.assets) && buildInfo.assets.length > 0, "build-info.json must list generated assets.");
 assert(Number.isFinite(Date.parse(buildInfo.generatedAt)), "build-info.json generatedAt is not a valid date.");
+assert(buildInfo.distIndexHash === sha256Hex(indexPath), "build-info distIndexHash does not match app/index.html.");
 
 const indexHtml = fs.readFileSync(indexPath, "utf8");
 const folderFileMap = new Map(folderFiles.map((file) => [file.relativePath, file.size]));
