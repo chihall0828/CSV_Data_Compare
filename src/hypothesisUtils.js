@@ -1,6 +1,6 @@
 import jstat from "jstat";
 
-const { jStat } = jstat;
+const jStat = jstat;
 
 function sampleStats(values) {
   const n = values.length;
@@ -135,6 +135,9 @@ export function runPairedT(aValues, bValues, alternative = "two-sided", alpha = 
   const s = sampleStats(diffs);
   if (!s || s.n < 2) return { error: "Need at least 2 paired observations." };
   const { n, mean: dMean, variance: dVar } = s;
+  if (!Number.isFinite(dVar) || dVar <= 0) {
+    return { error: "Paired t-test requires non-zero variance in paired differences." };
+  }
   const t = dMean / Math.sqrt(dVar / n);
   const df = n - 1;
   const sA = sampleStats(aValues);
@@ -199,14 +202,18 @@ export function runCorrelationTest(aValues, bValues, alternative = "two-sided", 
   if (Math.abs(r) === 1) {
     const sA = sampleStats(aValues);
     const sB = sampleStats(bValues);
+    const pValue = alternative === "two-sided"
+      ? 0
+      : (alternative === "greater" ? (r > 0 ? 0 : 1) : (r < 0 ? 0 : 1));
     return {
       testName: "Correlation significance test (Pearson r)",
       nA: n, nB: n,
       meanA: sA.mean, meanB: sB.mean,
       varianceA: sA.variance, varianceB: sB.variance,
       statistic: r, df: n - 2,
-      pValue: 0,
-      alpha, significant: true,
+      pValue,
+      alpha,
+      get significant() { return this.pValue < alpha; },
       meanDiff: null, effectSize: r * r,
       cautions: [
         "Perfect correlation detected (r = ±1).",
