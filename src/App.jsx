@@ -469,21 +469,6 @@ function safeFilePart(value) {
     .slice(0, 64) || "dataset";
 }
 
-function showModal(config) {
-  return new Promise((resolve) => {
-    modalResolveRef.current = resolve;
-    setModal(config);
-  });
-}
-
-function closeModal(result) {
-  if (modalResolveRef.current) {
-    modalResolveRef.current(result);
-    modalResolveRef.current = null;
-  }
-  setModal(null);
-}
-
 function xTypeLabel(type) {
   if (type === "time") return "時刻";
   if (type === "number") return "数値";
@@ -525,6 +510,21 @@ export default function App() {
   const settingsInputRef = useRef(null);
   const chartRef = useRef(null);
   const modalResolveRef = useRef(null);
+
+  function showModal(config) {
+    return new Promise((resolve) => {
+      modalResolveRef.current = resolve;
+      setModal(config);
+    });
+  }
+
+  function closeModal(result) {
+    if (modalResolveRef.current) {
+      modalResolveRef.current(result);
+      modalResolveRef.current = null;
+    }
+    setModal(null);
+  }
 
   useEffect(() => {
     try {
