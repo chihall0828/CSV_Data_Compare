@@ -11,6 +11,13 @@ import {
 } from "./hypothesisUtils.js";
 import { HelpButton, HelpDialog } from "./HelpDialog.jsx";
 import { HypothesisHelpContent } from "./statisticsHelpContent.jsx";
+import {
+  buildHypothesisExportPayload,
+  hypothesisPayloadToMarkdown,
+  downloadTextFile,
+  safeFileSlug,
+  dateStamp
+} from "./exportUtils.js";
 
 const TEST_TYPES = [
   { value: "one_sample_t", label: "One-sample t-test", twoSample: false },
@@ -106,6 +113,7 @@ export default function HypothesisTestSection({ datasets }) {
   const [alphaPreset, setAlphaPreset] = useState("0.05");
   const [alphaCustom, setAlphaCustom] = useState("0.05");
   const [result, setResult] = useState(null);
+  const [exportContext, setExportContext] = useState(null);
   const [runError, setRunError] = useState("");
   const [collapsed, setCollapsed] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -179,9 +187,48 @@ export default function HypothesisTestSection({ datasets }) {
       }
       if (res?.error) { setRunError(res.error); return; }
       setResult(res);
+      const sampleADesc = describeSample(aDatasetId, aColumn, aGroupCol, aGroupVal);
+      setExportContext({
+        sampleA: sampleADesc,
+        sampleB: isOneSample
+          ? { dataset: null, column: `μ₀ = ${parseFloat(mu0)}`, group: null }
+          : describeSample(bDatasetId, bColumn, bGroupCol, bGroupVal),
+        alternative
+      });
     } catch (err) {
       setRunError(String(err?.message ?? err));
     }
+  }
+
+  function describeSample(datasetId, column, groupCol, groupVal) {
+    const { ds, col } = getSampleSelection(datasetId, column, groupCol, groupVal);
+    return {
+      dataset: ds.name,
+      column: col,
+      group: groupCol && groupVal ? `${groupCol} = ${groupVal}` : null
+    };
+  }
+
+  function exportHypothesisJson() {
+    if (!result) return;
+    const payload = buildHypothesisExportPayload(result, exportContext ?? {});
+    const slug = safeFileSlug(exportContext?.sampleA?.dataset ?? "result");
+    downloadTextFile(
+      `hypothesis-test-result-${slug}-${dateStamp()}.json`,
+      JSON.stringify(payload, null, 2),
+      "application/json"
+    );
+  }
+
+  function exportHypothesisMarkdown() {
+    if (!result) return;
+    const payload = buildHypothesisExportPayload(result, exportContext ?? {});
+    const slug = safeFileSlug(exportContext?.sampleA?.dataset ?? "result");
+    downloadTextFile(
+      `hypothesis-test-result-${slug}-${dateStamp()}.md`,
+      hypothesisPayloadToMarkdown(payload),
+      "text/markdown"
+    );
   }
 
   function handleTestTypeChange(val) {
@@ -348,6 +395,14 @@ export default function HypothesisTestSection({ datasets }) {
               <ul className="hyp-cautions">
                 {result.cautions.map((c, i) => <li key={i}>{c}</li>)}
               </ul>
+              <div className="export-actions">
+                <button type="button" onClick={exportHypothesisJson}>
+                  Export hypothesis JSON
+                </button>
+                <button type="button" onClick={exportHypothesisMarkdown}>
+                  Export hypothesis Markdown
+                </button>
+              </div>
             </div>
           )}
         </div>

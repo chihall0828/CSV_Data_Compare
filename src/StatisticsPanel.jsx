@@ -12,6 +12,13 @@ import {
 import HypothesisTestSection from "./HypothesisTestSection.jsx";
 import { HelpButton, HelpDialog } from "./HelpDialog.jsx";
 import { UnivariateHelpContent, BivariateHelpContent } from "./statisticsHelpContent.jsx";
+import {
+  buildStatisticsExportPayload,
+  statisticsPayloadToMarkdown,
+  downloadTextFile,
+  safeFileSlug,
+  dateStamp
+} from "./exportUtils.js";
 
 const SAMPLE_MODES = [
   { value: "all", label: "All filtered rows" },
@@ -128,6 +135,8 @@ export default function StatisticsPanel({ datasets }) {
         filteredN,
         sampledN: sampledRows.length,
         missingCount,
+        sampleMode,
+        sampleParams: { n, seed, start, end },
         bivariate: {
           columnA: bivariateColumnA,
           columnB: bivariateColumnB,
@@ -141,6 +150,26 @@ export default function StatisticsPanel({ datasets }) {
       setComputeError(String(err?.message ?? err));
       setResult(null);
     }
+  }
+
+  function exportStatisticsJson() {
+    if (!result) return;
+    const payload = buildStatisticsExportPayload(result);
+    downloadTextFile(
+      `statistics-result-${safeFileSlug(result.datasetName)}-${dateStamp()}.json`,
+      JSON.stringify(payload, null, 2),
+      "application/json"
+    );
+  }
+
+  function exportStatisticsMarkdown() {
+    if (!result) return;
+    const payload = buildStatisticsExportPayload(result);
+    downloadTextFile(
+      `statistics-result-${safeFileSlug(result.datasetName)}-${dateStamp()}.md`,
+      statisticsPayloadToMarkdown(payload),
+      "text/markdown"
+    );
   }
 
   const colOptions = activeDataset ? activeDataset.numericColumns : [];
@@ -426,6 +455,14 @@ export default function StatisticsPanel({ datasets }) {
                       </table>
                     </div>
                   )}
+                  <div className="export-actions">
+                    <button type="button" onClick={exportStatisticsJson}>
+                      Export statistics JSON
+                    </button>
+                    <button type="button" onClick={exportStatisticsMarkdown}>
+                      Export statistics Markdown
+                    </button>
+                  </div>
                 </div>
               )}
             </>
