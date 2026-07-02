@@ -111,6 +111,18 @@ export function toNumber(value) {
   return Number.isFinite(number) ? number : null;
 }
 
+function isExactUtcDate(timestamp, year, month, day, hour, minute, second) {
+  const date = new Date(timestamp);
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() + 1 === month &&
+    date.getUTCDate() === day &&
+    date.getUTCHours() === hour &&
+    date.getUTCMinutes() === minute &&
+    date.getUTCSeconds() === second
+  );
+}
+
 export function parseDateLike(value) {
   const text = cleanHeader(value);
   if (isMissingValue(text)) return null;
@@ -120,15 +132,16 @@ export function parseDateLike(value) {
   );
   if (slashParts) {
     const [, year, month, day, hour = "0", minute = "0", second = "0"] = slashParts;
+    const parts = [year, month, day, hour, minute, second].map(Number);
     const timestamp = Date.UTC(
-      Number(year),
-      Number(month) - 1,
-      Number(day),
-      Number(hour),
-      Number(minute),
-      Number(second)
+      parts[0],
+      parts[1] - 1,
+      parts[2],
+      parts[3],
+      parts[4],
+      parts[5]
     );
-    return Number.isFinite(timestamp) ? timestamp : null;
+    return Number.isFinite(timestamp) && isExactUtcDate(timestamp, ...parts) ? timestamp : null;
   }
 
   const parsed = Date.parse(text);
