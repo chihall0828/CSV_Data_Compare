@@ -110,6 +110,13 @@ const DASH_PATTERNS = [[], [6, 4], [2, 3], [10, 4, 2, 4]];
 const MAX_GROUP_CHECKBOXES = 80;
 const TRACE_WARNING_THRESHOLD = 20;
 
+// Bundled sample files live under the app's base path. On GitHub Pages the
+// app is served from /CSV_Data_Compare/, so absolute "/..." URLs would 404.
+function withBase(path) {
+  const base = import.meta.env.BASE_URL ?? "/";
+  return `${base.replace(/\/$/, "")}${path}`;
+}
+
 const COMPARISON_SAMPLE_FILES = ["/sample-gnss.csv", "/sample-gnss-2.csv"];
 
 const REAL_SAMPLE_FILES = [
@@ -462,21 +469,6 @@ function safeFilePart(value) {
     .slice(0, 64) || "dataset";
 }
 
-function showModal(config) {
-  return new Promise((resolve) => {
-    modalResolveRef.current = resolve;
-    setModal(config);
-  });
-}
-
-function closeModal(result) {
-  if (modalResolveRef.current) {
-    modalResolveRef.current(result);
-    modalResolveRef.current = null;
-  }
-  setModal(null);
-}
-
 function xTypeLabel(type) {
   if (type === "time") return "時刻";
   if (type === "number") return "数値";
@@ -518,6 +510,21 @@ export default function App() {
   const settingsInputRef = useRef(null);
   const chartRef = useRef(null);
   const modalResolveRef = useRef(null);
+
+  function showModal(config) {
+    return new Promise((resolve) => {
+      modalResolveRef.current = resolve;
+      setModal(config);
+    });
+  }
+
+  function closeModal(result) {
+    if (modalResolveRef.current) {
+      modalResolveRef.current(result);
+      modalResolveRef.current = null;
+    }
+    setModal(null);
+  }
 
   useEffect(() => {
     try {
@@ -1163,7 +1170,7 @@ export default function App() {
     const baseDatasets = mode === "replace" ? [] : datasets;
     try {
       for (let index = 0; index < urls.length; index += 1) {
-        const response = await fetch(urls[index]);
+        const response = await fetch(withBase(urls[index]));
         if (!response.ok) throw new Error(`${urls[index]} を読み込めませんでした。`);
         const text = await response.text();
         const name = urls[index].split("/").pop();
@@ -1233,7 +1240,7 @@ export default function App() {
 
   async function loadExcelSample() {
     try {
-      const response = await fetch("/test-samples/sample-excel.xlsx");
+      const response = await fetch(withBase("/test-samples/sample-excel.xlsx"));
       if (!response.ok) throw new Error("Excelサンプルを読み込めませんでした。");
       const blob = await response.blob();
       const file = new File([blob], "sample-excel.xlsx", {
