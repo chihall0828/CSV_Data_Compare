@@ -415,6 +415,71 @@ h2 {
   font-weight: 800;
 }
 
+.plot-style-controls {
+  display: grid;
+  gap: 8px;
+  padding: 9px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #f8fafc;
+}
+
+.plot-style-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.plot-style-preview {
+  display: inline-flex;
+  min-width: 72px;
+  align-items: center;
+  gap: 8px;
+}
+
+.plot-style-swatch {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  border: 1px solid #cbd5e1;
+  border-radius: 50%;
+}
+
+.plot-style-line {
+  width: 42px;
+  border-top: 3px solid #2563eb;
+}
+
+.plot-style-preview.line-dashed .plot-style-line {
+  border-top-style: dashed;
+}
+
+.plot-style-preview.line-dotted .plot-style-line {
+  border-top-style: dotted;
+}
+
+.plot-style-preview.line-dashdot .plot-style-line {
+  border-top-style: dashed;
+}
+
+.plot-style-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.plot-style-grid label {
+  display: grid;
+  gap: 4px;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .group-filter,
 .row-filter,
 .calculated-columns {
@@ -1135,6 +1200,14 @@ td.num {
   margin-bottom: 14px;
 }
 
+.stats-form-heading {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+  color: #172033;
+  font-size: 14px;
+  font-weight: 800;
+}
+
 .stats-form .primary-button {
   align-self: end;
   grid-column: 1 / -1;
@@ -1161,6 +1234,18 @@ td.num {
 
 .stat-result {
   margin-top: 10px;
+}
+
+.stat-subsection {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #eef1f6;
+}
+
+.stat-subsection h3 {
+  margin: 0 0 10px;
+  color: #172033;
+  font-size: 15px;
 }
 
 .stat-meta {

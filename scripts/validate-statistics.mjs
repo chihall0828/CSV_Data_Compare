@@ -1,8 +1,11 @@
 import {
   extractNumericValues,
+  extractNumericPairs,
   computeUnivariate,
+  computeBivariate,
   applySampleMode,
-  seededRandomSample
+  seededRandomSample,
+  applyRowFilter
 } from "../src/statisticsUtils.js";
 import {
   runOneSampleT,
@@ -72,6 +75,54 @@ assert(extracted.values.length === 5, `extractNumericValues: expected 5 values, 
 assert(extracted.missingCount === 3, `extractNumericValues: expected 3 missing, got ${extracted.missingCount}`);
 const extractedStats = computeUnivariate(extracted.values);
 assert(nearlyEqual(extractedStats.mean, 3), `extracted mean: expected 3, got ${extractedStats.mean}`);
+
+// ---- computeBivariate / extractNumericPairs ----
+
+const pairRows = [
+  { a: "1", b: "2" },
+  { a: "2", b: "4" },
+  { a: "", b: "6" },       // missing a -> excluded
+  { a: "3", b: "abc" },    // non-numeric b -> excluded
+  { a: "3", b: "6" },
+  { a: "4", b: "8" }
+];
+
+const extractedPairs = extractNumericPairs(pairRows, "a", "b");
+assert(extractedPairs.pairs.length === 4, `extractNumericPairs: expected 4 pairs, got ${extractedPairs.pairs.length}`);
+assert(extractedPairs.excludedCount === 2, `extractNumericPairs: expected 2 excluded, got ${extractedPairs.excludedCount}`);
+
+const bivariate = computeBivariate(extractedPairs.pairs);
+assert(bivariate.n === 4, `bivariate n: expected 4, got ${bivariate.n}`);
+assert(nearlyEqual(bivariate.covariance, 10 / 3), `covariance: expected ${10 / 3}, got ${bivariate.covariance}`);
+assert(nearlyEqual(bivariate.pearson, 1), `pearson: expected 1, got ${bivariate.pearson}`);
+assert(nearlyEqual(bivariate.rSquared, 1), `rSquared: expected 1, got ${bivariate.rSquared}`);
+
+const bivariateSingle = computeBivariate([[1, 2]]);
+assert(bivariateSingle.n === 1, "bivariate n=1: n should be 1");
+assert(bivariateSingle.covariance === null, "bivariate n=1: covariance should be null");
+assert(bivariateSingle.pearson === null, "bivariate n=1: pearson should be null");
+assert(bivariateSingle.rSquared === null, "bivariate n=1: rSquared should be null");
+
+const zeroVariance = computeBivariate([[5, 1], [5, 2], [5, 3]]);
+assert(zeroVariance.n === 3, "zero variance: n should be 3");
+assert(nearlyEqual(zeroVariance.covariance, 0), `zero variance covariance: expected 0, got ${zeroVariance.covariance}`);
+assert(zeroVariance.pearson === null, "zero variance: pearson should be null");
+assert(zeroVariance.rSquared === null, "zero variance: rSquared should be null");
+
+const filteredForPairs = applyRowFilter(
+  [
+    { a: "1", b: "2" },
+    { a: "2", b: "4" },
+    { a: "3", b: "6" },
+    { a: "4", b: "8" }
+  ],
+  { start: 2, end: 4 }
+);
+const sampledForPairs = applySampleMode(filteredForPairs, "first_n", { n: 2 });
+const orderedPairs = extractNumericPairs(sampledForPairs, "a", "b").pairs;
+assert(orderedPairs.length === 2, `filtered/sampled pairs: expected 2, got ${orderedPairs.length}`);
+assert(orderedPairs[0][0] === 2 && orderedPairs[0][1] === 4, "filtered/sampled pairs: first pair should be row 2");
+assert(orderedPairs[1][0] === 3 && orderedPairs[1][1] === 6, "filtered/sampled pairs: second pair should be row 3");
 
 // ---- applySampleMode ----
 
