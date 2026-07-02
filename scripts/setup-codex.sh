@@ -95,4 +95,8 @@ if [ -f scripts/validate-statistics.mjs ]; then
   run_node scripts/validate-statistics.mjs
 fi
 
+if [ -f scripts/validate-plot-style.mjs ]; then
+  run_node scripts/validate-plot-style.mjs
+fi
+
 echo "== Setup complete =="
