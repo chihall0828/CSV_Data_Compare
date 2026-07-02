@@ -1,4 +1,4 @@
-CSV Data Compare Portable
+﻿CSV Data Compare Portable
 
 How to start:
 1. Double-click "Start CSV Data Compare.bat".

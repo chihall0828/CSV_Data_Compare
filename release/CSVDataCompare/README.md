@@ -45,6 +45,35 @@ release/CSVDataCompare-portable.zip
 
 旧配布名 `ENUCSVCompare` は測位データ向けの印象が強かったため、Part3以降の新しい配布物は `CSVDataCompare` として生成します。
 
+## Web版とPortable版の違い
+
+このアプリには2つの利用形態があります。
+
+| | Web版 | Portable版 |
+|---|---|---|
+| 起動方法 | ブラウザでURLを開く | `.bat` をダブルクリック |
+| インストール | 不要 | 不要（zip展開のみ） |
+| インターネット接続 | 必要 | 不要（完全オフライン） |
+| 対応OS | ブラウザが動く環境 | Windows 10/11 |
+| CSV/Excel処理場所 | ブラウザ内で完結 | ブラウザ内で完結 |
+| データのサーバー送信 | **なし** | **なし** |
+
+### Web版
+
+GitHub Pagesでホストしています。URLを開くだけで使えます。インストール・展開は不要です。
+
+- **CSV/Excelはサーバーへアップロードされません。** 読み込んだファイルのデータはすべてブラウザ内で処理します。外部サーバーへの送信は一切行いません。
+- ページを閉じると読み込んだCSV/Excelデータは消えます（グラフ設定などlocalStorageに保存した項目は残ります）。
+- `main` ブランチへのpushで自動的に最新版が公開されます（GitHub Actions経由）。
+
+### Portable版
+
+Windows環境でオフライン利用したい場合や、インターネット接続なしで使いたい場合に使います。
+
+- `release/CSVDataCompare-portable.zip` を展開し、`Start CSV Data Compare.bat` をダブルクリックで起動します。
+- ローカルのNode.jsサーバー経由でブラウザが開きます。インターネット接続は不要です。
+- **こちらもデータはサーバーへ送信しません。** すべてブラウザ内処理です（サーバーは静的ファイル配信のみ）。
+
 ## CSV/Excelの読み込み方法
 
 通常利用では、画面上のドラッグ＆ドロップ領域にCSVまたはExcelを置きます。複数ファイルをまとめて置くこともできます。
@@ -130,6 +159,13 @@ sqrt(([KF_E_m] - [Relative_E_m])^2 + ([KF_N_m] - [Relative_N_m])^2)
 - `Marker size`: 点マーカーの大きさを変更します。初期値は5です。
 - `Start/end marker`: XY Plotの開始点・終了点マーカーの大きさを変更します。初期値は9です。
 
+読み込み済みファイルカードの **Plot style** では、データセットごとに色と線種を指定できます。
+
+- `Color`: `Auto`, `Blue`, `Red`, `Green`, `Purple`, `Orange`, `Cyan`, `Gray`, `Custom hex` から選びます。
+- `Custom hex`: `#RRGGBB` 形式だけ使えます。不正な値は保存・適用されません。
+- `Line style`: `Auto`, `Solid`, `Dashed`, `Dotted`, `Dash-dot` から選びます。
+- `Auto` の場合は従来通り、ファイル順や `Group / Split column` のグループ値から自動で色・線種を決めます。
+
 点を表示すると、大きいCSVでは描画が重くなる場合があります。重い場合は `Markers` をOffにするか、表示するCSVやY列を減らしてください。
 
 これらの設定と等倍スケール設定はブラウザに保存され、次回起動時にも復元されます。
@@ -189,6 +225,70 @@ XY Plotでは、ファイルごとの `XY X` と `XY Y` の列を使って平面
 
 点が多すぎる、または重なって見える
 : 同じCSVの二重読み込み、選択Y列の増えすぎ、X列の重複が主な原因です。アプリは同一CSVを既定でスキップし、X重複はグラフ上の警告とファイル別診断に表示します。
+
+## 統計量パネル（Phase 1）
+
+CSV/Excelを読み込んだ後、画面下部の **Statistics** パネルで選択した列の統計量を計算できます。
+
+### 基本操作
+
+1. **Dataset** で対象ファイルを選びます。
+2. **Column** で統計量を出したい数値列を選びます。計算列も選択できます。
+3. **Sample mode** でサンプル抽出方法を選びます。
+4. **Compute statistics** を押します。
+
+### Sample mode
+
+| モード | 説明 |
+|---|---|
+| All filtered rows | Row filter適用後の全行を使用（デフォルト） |
+| First n rows | 先頭n行 |
+| Last n rows | 末尾n行 |
+| Random n rows | seed固定のランダムn行（seed=42がデフォルト） |
+| Row range | 指定した行番号の範囲（ヘッダー行を除いたデータ行番号） |
+
+- 既存の **Row filter** が先に適用されます。その後に Sample mode が追加で適用されます。
+- 結果には「After row filter: N rows / Statistics sample: M rows」と両方の件数が表示されます。
+
+### 出力される統計量
+
+| 統計量 | 説明 |
+|---|---|
+| Count (n) | 有効な数値の件数 |
+| Missing | 欠損・非数値として除外した件数 |
+| Mean | 平均 |
+| Variance (unbiased) | 不偏分散（n-1除算） |
+| Std dev | 標準偏差 |
+| Min | 最小値 |
+| Max | 最大値 |
+| Median | 中央値 |
+
+- 分散と標準偏差は n ≥ 2 のときのみ計算します。n = 1 の場合は「— (n < 2)」と表示されます。
+- 欠損値、空欄、数値に変換できない値はすべて Missing としてカウントし、統計計算から除外します。
+
+### 2変量統計（Phase 2）
+
+Statisticsパネルの **Bivariate statistics** セクションでは、**Column A** と **Column B** を選んで2列間の関係を確認できます。
+
+| 統計量 | 説明 |
+|---|---|
+| Valid pair count | 2列とも数値として使える行の件数 |
+| Covariance (unbiased) | 不偏共分散（n-1除算） |
+| Pearson correlation | Pearsonの相関係数 |
+| R squared | 相関係数の二乗（r²） |
+
+- 既存の **Row filter** と **Sample mode** を適用した後の行を使います。
+- 欠損値、空欄、非数値を含む行は有効ペアから除外します。
+- 有効ペア数が2未満の場合、共分散・相関係数・R²は計算しません。
+- 片方の列の分散が0の場合、相関係数とR²は計算しません。
+
+### Phase 1 の制限
+
+Phase 1/2 では以下は未対応です。将来のPhaseで追加予定です。
+
+- 仮説検定（t検定・F検定など）(→ Phase 3)
+- 統計結果のエクスポート (→ Phase 4)
+- LLMによる読み取り候補の提案 (→ Phase 5)
 
 ## 開発者向け
 
@@ -331,6 +431,8 @@ CompactやHiddenでも、グラフ上の点や線にマウスを重ねるとtool
 
 `Group / Split column` を使う場合、同じグループ値からハッシュを作って色を決めます。そのため、`normal` や `block_az0_60_ele70` など同じグループ値は、再読み込み後も同じ色になりやすくなっています。Time Series Plotではグループを色で固定し、E/N/Uなどの列は線種と凡例で区別する方針です。
 
+ファイルカードの **Plot style** でColorを明示指定した場合は、グループ色よりもデータセット指定色を優先します。Colorが`Auto`なら従来通りグループごとの色分けを維持します。Line styleも`Auto`なら従来の自動線種を使い、明示指定した場合はTime Series PlotとXY Plotに反映されます。XY PlotのStart/End markerとPNG保存にも同じ設定が反映されます。
+
 ### グループフィルタ
 
 グループフィルタには以下の操作があります。
@@ -362,6 +464,7 @@ CompactやHiddenでも、グラフ上の点や線にマウスを重ねるとtool
 - Group / Split column
 - 表示ON/OFF中のグループ
 - Row filter
+- データセットごとのPlot style（Color、Custom hex、Line style）
 - 線幅、Markers、Marker size、Start/end marker size
 - Equal scale
 - グラフタイトル、軸ラベル、表示範囲
