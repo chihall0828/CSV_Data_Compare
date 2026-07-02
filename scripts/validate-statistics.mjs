@@ -7,6 +7,14 @@ import {
   seededRandomSample,
   applyRowFilter
 } from "../src/statisticsUtils.js";
+import {
+  runOneSampleT,
+  runIndependentT,
+  runWelchT,
+  runPairedT,
+  runFTest,
+  runCorrelationTest
+} from "../src/hypothesisUtils.js";
 
 const failures = [];
 
@@ -181,6 +189,104 @@ const allSampled = seededRandomSample(tenRows, 10, 42);
 assert(allSampled.length === 10, `seededRandomSample n>=rows: expected 10, got ${allSampled.length}`);
 const allSampledBig = seededRandomSample(tenRows, 99, 42);
 assert(allSampledBig.length === 10, `seededRandomSample n=99 from 10: expected 10, got ${allSampledBig.length}`);
+
+// ---- hypothesis tests ----
+
+// One-sample t-test: [2,3,4,5,6] vs mu0=3, two-sided
+// n=5, mean=4, s²=2.5, t=√2≈1.4142, df=4, p≈0.2302
+const r1 = runOneSampleT([2, 3, 4, 5, 6], 3, "two-sided", 0.05);
+assert(!r1.error, `oneSampleT: unexpected error: ${r1.error}`);
+assert(r1.nA === 5, `oneSampleT nA: expected 5, got ${r1.nA}`);
+assert(nearlyEqual(r1.meanA, 4), `oneSampleT meanA: expected 4, got ${r1.meanA}`);
+assert(nearlyEqual(r1.pValue, 0.2302, 1e-3), `oneSampleT p: expected ~0.2302, got ${r1.pValue}`);
+assert(!r1.significant, "oneSampleT: should not be significant at alpha=0.05");
+// When mean == mu0, t should be 0 and p should be 1.0
+const r1b = runOneSampleT([2, 3, 4, 5, 6], 4, "two-sided", 0.05);
+assert(nearlyEqual(r1b.statistic, 0, 1e-10), `oneSampleT t==0: expected 0, got ${r1b.statistic}`);
+assert(nearlyEqual(r1b.pValue, 1.0, 1e-6), `oneSampleT p==1: expected 1.0, got ${r1b.pValue}`);
+const r1c = runOneSampleT([5, 5, 5], 5, "two-sided", 0.05);
+assert(r1c.error, "oneSampleT: should error when sample variance is zero and mean equals mu0");
+const r1d = runOneSampleT([5, 5, 5], 4, "two-sided", 0.05);
+assert(r1d.error, "oneSampleT: should error when sample variance is zero and mean differs from mu0");
+
+// Independent t-test: A=[1,2,3,4,5] B=[3,4,5,6,7], p≈0.0805
+const r2 = runIndependentT([1, 2, 3, 4, 5], [3, 4, 5, 6, 7], "two-sided", 0.05);
+assert(!r2.error, `independentT: unexpected error: ${r2.error}`);
+assert(r2.nA === 5 && r2.nB === 5, `independentT n: expected 5/5, got ${r2.nA}/${r2.nB}`);
+assert(nearlyEqual(r2.meanA, 3) && nearlyEqual(r2.meanB, 5), `independentT means`);
+assert(nearlyEqual(r2.pValue, 0.0805, 1e-3), `independentT p: expected ~0.0805, got ${r2.pValue}`);
+assert(!r2.significant, "independentT: should not be significant at alpha=0.05");
+// Effect size (Cohen's d) for equal means = 0
+const r2b = runIndependentT([1, 2, 3], [1, 2, 3], "two-sided", 0.05);
+assert(nearlyEqual(r2b.statistic, 0, 1e-10), `independentT t==0 when equal`);
+
+// Welch's t-test: same as independent when variances equal → p≈0.0805
+const r3 = runWelchT([1, 2, 3, 4, 5], [3, 4, 5, 6, 7], "two-sided", 0.05);
+assert(!r3.error, `welchT: unexpected error: ${r3.error}`);
+assert(nearlyEqual(r3.pValue, 0.0805, 1e-3), `welchT p: expected ~0.0805, got ${r3.pValue}`);
+// Welch df with unequal variances should differ from pooled df
+const r3b = runWelchT([1, 2, 3, 4, 5], [10, 20, 30, 40, 50]);
+assert(typeof r3b.df === "number" && r3b.df > 0, `welchT df: should be numeric positive`);
+
+// Paired t-test: A=[3,5,7,9,11] B=[1,4,5,8,10], diffs=[2,1,2,1,1], mean_d=1.4, p≈0.0046
+const r4 = runPairedT([3, 5, 7, 9, 11], [1, 4, 5, 8, 10], "two-sided", 0.05);
+assert(!r4.error, `pairedT: unexpected error: ${r4.error}`);
+assert(r4.nA === 5, `pairedT nA: expected 5, got ${r4.nA}`);
+assert(nearlyEqual(r4.meanDiff, 1.4), `pairedT meanDiff: expected 1.4, got ${r4.meanDiff}`);
+assert(nearlyEqual(r4.pValue, 0.0046, 1e-3), `pairedT p: expected ~0.0046, got ${r4.pValue}`);
+assert(r4.significant, "pairedT: should be significant at alpha=0.05");
+// Unequal lengths must return error
+const r4e = runPairedT([1, 2, 3], [1, 2]);
+assert(r4e.error, "pairedT: should error on unequal lengths");
+
+// F-test: A=[1,2,3,4,5] varA=2.5, B=[2,4,6,8,10] varB=10, F=0.25, df1=df2=4, p≈0.208
+const r5 = runFTest([1, 2, 3, 4, 5], [2, 4, 6, 8, 10], "two-sided", 0.05);
+assert(!r5.error, `fTest: unexpected error: ${r5.error}`);
+assert(nearlyEqual(r5.statistic, 0.25), `fTest F: expected 0.25, got ${r5.statistic}`);
+assert(nearlyEqual(r5.pValue, 0.208, 1e-2), `fTest p: expected ~0.208, got ${r5.pValue}`);
+// Zero variance in B should error
+const r5e = runFTest([1, 2, 3], [5, 5, 5]);
+assert(r5e.error, "fTest: should error on zero variance in B");
+
+// Correlation significance test: xs=[1,2,3,4,5] ys=[2,3,5,4,6] r=0.9, p≈0.0374
+const r6 = runCorrelationTest([1, 2, 3, 4, 5], [2, 3, 5, 4, 6], "two-sided", 0.05);
+assert(!r6.error, `corrTest: unexpected error: ${r6.error}`);
+assert(nearlyEqual(r6.statistic, 0.9, 1e-6), `corrTest r: expected 0.9, got ${r6.statistic}`);
+assert(nearlyEqual(r6.pValue, 0.0374, 1e-3), `corrTest p: expected ~0.0374, got ${r6.pValue}`);
+assert(r6.significant, "corrTest: should be significant at alpha=0.05");
+// Effect size should be r²
+assert(nearlyEqual(r6.effectSize, 0.81, 1e-6), `corrTest r²: expected 0.81, got ${r6.effectSize}`);
+// Unequal lengths must return error
+const r6e = runCorrelationTest([1, 2, 3], [1, 2]);
+assert(r6e.error, "corrTest: should error on unequal lengths");
+
+// Paired/correlation values must preserve row pairs when gaps occur in different rows.
+const gappedPairRows = [
+  { a: "1", b: "2" },
+  { a: "", b: "999" },
+  { a: "2", b: "4" },
+  { a: "999", b: "" },
+  { a: "3", b: "6" }
+];
+const separateA = extractNumericValues(gappedPairRows, "a").values;
+const separateB = extractNumericValues(gappedPairRows, "b").values;
+assert(separateA.length === 4 && separateB.length === 4, "gapped pairs sanity: separate extraction stays length 4");
+const alignedPairs = extractNumericPairs(gappedPairRows, "a", "b").pairs;
+assert(alignedPairs.length === 3, `aligned pairs: expected 3, got ${alignedPairs.length}`);
+assert(
+  JSON.stringify(alignedPairs) === JSON.stringify([[1, 2], [2, 4], [3, 6]]),
+  `aligned pairs: unexpected pairs ${JSON.stringify(alignedPairs)}`
+);
+const alignedA = alignedPairs.map(([a]) => a);
+const alignedB = alignedPairs.map(([, b]) => b);
+const r4Aligned = runPairedT(alignedA, alignedB, "two-sided", 0.05);
+assert(!r4Aligned.error, `pairedT aligned gaps: unexpected error: ${r4Aligned.error}`);
+assert(r4Aligned.nA === 3, `pairedT aligned gaps n: expected 3, got ${r4Aligned.nA}`);
+assert(nearlyEqual(r4Aligned.meanDiff, -2), `pairedT aligned gaps meanDiff: expected -2, got ${r4Aligned.meanDiff}`);
+const r6Aligned = runCorrelationTest(alignedA, alignedB, "two-sided", 0.05);
+assert(!r6Aligned.error, `corrTest aligned gaps: unexpected error: ${r6Aligned.error}`);
+assert(r6Aligned.nA === 3, `corrTest aligned gaps n: expected 3, got ${r6Aligned.nA}`);
+assert(nearlyEqual(r6Aligned.statistic, 1, 1e-10), `corrTest aligned gaps r: expected 1, got ${r6Aligned.statistic}`);
 
 // ---- report ----
 
