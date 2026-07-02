@@ -282,6 +282,15 @@ Statisticsパネルの **Bivariate statistics** セクションでは、**Column
 - 有効ペア数が2未満の場合、共分散・相関係数・R²は計算しません。
 - 片方の列の分散が0の場合、相関係数とR²は計算しません。
 
+### 統計結果のExport
+
+計算した統計結果は、後からレポートや研究資料に使える形で保存できます。
+
+- **Export statistics JSON** / **Export statistics Markdown** — Statistics結果の下に表示されます。単変量統計と2変量統計、サンプル条件（Sample mode・行数）を含みます。
+- **Export hypothesis JSON** / **Export hypothesis Markdown** — Hypothesis Test結果の下に表示されます。検定名、Sample A/B（dataset・column・group）、statistic、自由度、p-value、alpha、判定、効果量、注意文を含みます。
+- ファイル名には結果種別・dataset名・日付が入ります（例: `statistics-result-sample-20260702.json`）。
+- Markdownはそのままレポートに貼り付けられる表形式です。
+
 ### Phase 1 の制限
 
 Phase 1/2 では以下は未対応です。将来のPhaseで追加予定です。

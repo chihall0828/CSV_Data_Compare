@@ -1637,3 +1637,28 @@ td.num {
 .help-dialog-body p {
   margin: 0 0 10px;
 }
+
+/* ── Statistics result export buttons ────────────────────────────────── */
+
+.export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.export-actions button {
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #fff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.export-actions button:hover {
+  background: #eff6ff;
+}
