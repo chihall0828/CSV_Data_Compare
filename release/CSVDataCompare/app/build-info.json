@@ -1,10 +1,10 @@
 ﻿{
     "app":  "CSV Data Compare",
     "packageName":  "CSVDataCompare",
-    "generatedAt":  "2026-07-02T05:29:17Z",
-    "distIndexHash":  "A6CAB519C877268DBF90B082B0443DBCE7878AA749428E1DD88FEC06C610A278",
+    "generatedAt":  "2026-07-02T05:43:52Z",
+    "distIndexHash":  "28E0BE2F84E4EEE25F33C0BAE7B7411671FEA5A5109517EF5FD5D7B081E526A7",
     "assets":  [
-                   "index-BxAjWvjA.css",
-                   "index-DNbfBkMn.js"
+                   "index-BwsJ_ITZ.js",
+                   "index-BxAjWvjA.css"
                ]
 }
