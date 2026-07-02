@@ -9,6 +9,8 @@ import {
   runFTest,
   runCorrelationTest
 } from "./hypothesisUtils.js";
+import { HelpButton, HelpDialog } from "./HelpDialog.jsx";
+import { HypothesisHelpContent } from "./statisticsHelpContent.jsx";
 
 const TEST_TYPES = [
   { value: "one_sample_t", label: "One-sample t-test", twoSample: false },
@@ -106,6 +108,7 @@ export default function HypothesisTestSection({ datasets }) {
   const [result, setResult] = useState(null);
   const [runError, setRunError] = useState("");
   const [collapsed, setCollapsed] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   if (!datasets || datasets.length === 0) return null;
 
@@ -193,15 +196,31 @@ export default function HypothesisTestSection({ datasets }) {
 
   return (
     <div className="hyp-section">
-      <button
-        type="button"
-        className="hyp-toggle"
-        onClick={() => setCollapsed(c => !c)}
-        aria-expanded={!collapsed}
+      <div className="stats-header-row">
+        <button
+          type="button"
+          className="hyp-toggle"
+          onClick={() => setCollapsed(c => !c)}
+          aria-expanded={!collapsed}
+        >
+          <span className="hyp-toggle-title">Hypothesis Test</span>
+          <span className="stats-toggle-arrow">{collapsed ? "▸" : "▾"}</span>
+        </button>
+        <HelpButton
+          open={helpOpen}
+          onToggle={() => setHelpOpen((v) => !v)}
+          dialogId="hypothesis-help-dialog"
+          label="仮説検定の選び方ヘルプを開く"
+        />
+      </div>
+      <HelpDialog
+        open={helpOpen}
+        onClose={() => setHelpOpen(false)}
+        dialogId="hypothesis-help-dialog"
+        title="仮説検定の見方と選び方"
       >
-        <span className="hyp-toggle-title">Hypothesis Test</span>
-        <span className="stats-toggle-arrow">{collapsed ? "▸" : "▾"}</span>
-      </button>
+        <HypothesisHelpContent />
+      </HelpDialog>
 
       {!collapsed && (
         <div className="hyp-body">
