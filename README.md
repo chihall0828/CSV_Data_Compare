@@ -340,6 +340,8 @@ npm run package:portable
 powershell -ExecutionPolicy Bypass -File scripts/create-portable-package.ps1 -NodePath "node.exeへのパス"
 ```
 
+release再生成の完全な手順・確認項目は [docs/portable-release-checklist.md](docs/portable-release-checklist.md) を参照してください。
+
 ## ファイル構成
 
 ```text
