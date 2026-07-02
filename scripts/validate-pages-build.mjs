@@ -33,10 +33,35 @@ const cssAssets = assetMatches.filter((assetUrl) => assetUrl.endsWith(".css"));
 assert(jsAssets.length > 0, "Built index.html must reference at least one JavaScript asset.");
 assert(cssAssets.length > 0, "Built index.html must reference at least one CSS asset.");
 
+// The in-app sample buttons fetch these bundled files at runtime; if any is
+// missing from dist, the buttons 404 on the published site.
+const SAMPLE_FILES = [
+  "sample-gnss.csv",
+  "sample-gnss-2.csv",
+  "real-samples/20260525_1KF_result_ENU_normal.csv",
+  "real-samples/20260525_1KF_result_ENU_block_az0_60_ele70.csv",
+  "real-samples/20260525_1Comparison_timeseries.csv",
+  "test-samples/missing-values.csv",
+  "test-samples/non-numeric-mixed.csv",
+  "test-samples/日本語ファイル名.csv",
+  "test-samples/no-enu-columns.csv",
+  "test-samples/large-sample.csv",
+  "test-samples/column-calculation.csv",
+  "test-samples/sample-excel.xlsx",
+  "favicon.svg"
+];
+
+for (const sampleFile of SAMPLE_FILES) {
+  const samplePath = path.join(distDir, sampleFile);
+  assert(fs.existsSync(samplePath), `Bundled sample file is missing from dist: ${sampleFile}`);
+  assert(fs.statSync(samplePath).size > 0, `Bundled sample file is empty: ${sampleFile}`);
+}
+
 console.log(
   JSON.stringify({
     status: "ok",
     baseUrl,
-    assets: assetMatches.map((assetUrl) => assetUrl.slice(baseUrl.length)).sort()
+    assets: assetMatches.map((assetUrl) => assetUrl.slice(baseUrl.length)).sort(),
+    sampleFilesChecked: SAMPLE_FILES.length
   })
 );
