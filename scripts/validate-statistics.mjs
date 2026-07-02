@@ -219,6 +219,10 @@ assert(!r2.significant, "independentT: should not be significant at alpha=0.05")
 // Effect size (Cohen's d) for equal means = 0
 const r2b = runIndependentT([1, 2, 3], [1, 2, 3], "two-sided", 0.05);
 assert(nearlyEqual(r2b.statistic, 0, 1e-10), `independentT t==0 when equal`);
+const r2z = runIndependentT([2, 2, 2], [2, 2, 2], "two-sided", 0.05);
+assert(r2z.error, "independentT: should error when pooled variance is zero and means are equal");
+const r2zd = runIndependentT([2, 2, 2], [1, 1, 1], "two-sided", 0.05);
+assert(r2zd.error, "independentT: should error when pooled variance is zero and means differ");
 
 // Welch's t-test: same as independent when variances equal → p≈0.0805
 const r3 = runWelchT([1, 2, 3, 4, 5], [3, 4, 5, 6, 7], "two-sided", 0.05);
@@ -227,6 +231,10 @@ assert(nearlyEqual(r3.pValue, 0.0805, 1e-3), `welchT p: expected ~0.0805, got ${
 // Welch df with unequal variances should differ from pooled df
 const r3b = runWelchT([1, 2, 3, 4, 5], [10, 20, 30, 40, 50]);
 assert(typeof r3b.df === "number" && r3b.df > 0, `welchT df: should be numeric positive`);
+const r3z = runWelchT([2, 2, 2], [2, 2, 2], "two-sided", 0.05);
+assert(r3z.error, "welchT: should error when both groups have zero variance and means are equal");
+const r3zd = runWelchT([2, 2, 2], [1, 1, 1], "two-sided", 0.05);
+assert(r3zd.error, "welchT: should error when both groups have zero variance and means differ");
 
 // Paired t-test: A=[3,5,7,9,11] B=[1,4,5,8,10], diffs=[2,1,2,1,1], mean_d=1.4, p≈0.0046
 const r4 = runPairedT([3, 5, 7, 9, 11], [1, 4, 5, 8, 10], "two-sided", 0.05);

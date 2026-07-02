@@ -77,6 +77,9 @@ export function runIndependentT(aValues, bValues, alternative = "two-sided", alp
   const { n: nA, mean: meanA, variance: varA } = sA;
   const { n: nB, mean: meanB, variance: varB } = sB;
   const pooled = ((nA - 1) * varA + (nB - 1) * varB) / (nA + nB - 2);
+  if (!Number.isFinite(pooled) || pooled <= 0) {
+    return { error: "Independent t-test requires non-zero pooled variance." };
+  }
   const t = (meanA - meanB) / Math.sqrt(pooled * (1 / nA + 1 / nB));
   const df = nA + nB - 2;
   return {
@@ -107,8 +110,16 @@ export function runWelchT(aValues, bValues, alternative = "two-sided", alpha = 0
   const { n: nB, mean: meanB, variance: varB } = sB;
   const seA2 = varA / nA;
   const seB2 = varB / nB;
-  const t = (meanA - meanB) / Math.sqrt(seA2 + seB2);
-  const df = (seA2 + seB2) ** 2 / (seA2 ** 2 / (nA - 1) + seB2 ** 2 / (nB - 1));
+  const se2 = seA2 + seB2;
+  if (!Number.isFinite(se2) || se2 <= 0) {
+    return { error: "Welch's t-test requires non-zero variance in at least one group." };
+  }
+  const t = (meanA - meanB) / Math.sqrt(se2);
+  const dfDenominator = seA2 ** 2 / (nA - 1) + seB2 ** 2 / (nB - 1);
+  if (!Number.isFinite(dfDenominator) || dfDenominator <= 0) {
+    return { error: "Welch's t-test degrees of freedom are undefined for these variances." };
+  }
+  const df = se2 ** 2 / dfDenominator;
   return {
     testName: "Welch's t-test",
     nA, nB, meanA, meanB,
