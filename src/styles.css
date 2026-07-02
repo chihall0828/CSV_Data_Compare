@@ -1355,3 +1355,285 @@ td.num {
 }
 
 .hyp-cautions li { margin-bottom: 0.2rem; }
+
+/* ── Help buttons & help dialogs ─────────────────────────────────────── */
+
+.stats-header-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stats-header-row .stats-toggle,
+.stats-header-row .hyp-toggle {
+  flex: 1;
+  min-width: 0;
+}
+
+.statistics-panel > .stats-header-row .help-button {
+  margin-right: 14px;
+}
+
+.help-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border: 1px solid #bfdbfe;
+  border-radius: 50%;
+  background: #fff;
+  color: #1d4ed8;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.help-button:hover {
+  background: #dbeafe;
+}
+
+.help-button:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.stats-form-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.help-dialog {
+  display: flex;
+  flex-direction: column;
+  max-width: 640px;
+  width: min(92vw, 640px);
+  max-height: 82vh;
+  padding: 20px 24px;
+}
+
+.help-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.help-dialog-header h3 {
+  margin: 0;
+}
+
+.help-close-button {
+  padding: 2px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #6b7280;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.help-close-button:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.help-close-button:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.help-dialog-body {
+  overflow-y: auto;
+  color: #374151;
+  font-size: 13.5px;
+  line-height: 1.65;
+}
+
+.help-dialog-body h4 {
+  margin: 14px 0 6px;
+  color: #172033;
+  font-size: 13.5px;
+}
+
+.help-dialog-body h4:first-child {
+  margin-top: 0;
+}
+
+.help-dialog-body ul,
+.help-dialog-body ol {
+  margin: 0 0 10px;
+  padding-left: 20px;
+}
+
+.help-dialog-body li {
+  margin-bottom: 3px;
+}
+
+.help-term-list {
+  display: grid;
+  gap: 7px;
+  margin: 0 0 10px;
+}
+
+.help-term-list dt {
+  color: #172033;
+  font-weight: 700;
+}
+
+.help-term-list dd {
+  margin: 0;
+}
+
+.help-dialog-footer {
+  margin-top: 12px;
+}
+
+@media (max-width: 640px) {
+  .help-dialog {
+    width: 94vw;
+    max-height: 88vh;
+    padding: 16px;
+  }
+}
+
+/* ── Calculated columns editor blocks ────────────────────────────────── */
+
+.calc-block {
+  display: grid;
+  gap: 7px;
+  padding: 10px 12px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.calc-block-title {
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.calc-name-field {
+  display: grid;
+  gap: 5px;
+  max-width: 320px;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.calc-block .formula-field {
+  display: grid;
+  gap: 5px;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.calc-toolbar {
+  display: grid;
+  gap: 4px;
+}
+
+.calc-toolbar-label {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.calc-operator-list button {
+  min-width: 34px;
+}
+
+.calc-preview-ok {
+  margin: 0;
+  color: #047857;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.calc-preview-error {
+  margin: 0;
+  color: #b45309;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.calc-preview-table {
+  min-width: 220px;
+  max-width: 380px;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.calc-preview-table th,
+.calc-preview-table td {
+  padding: 4px 10px;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+}
+
+.calc-preview-table thead th {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.calc-examples {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 6px;
+}
+
+.calc-examples button {
+  display: grid;
+  gap: 2px;
+  padding: 7px 10px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  text-align: left;
+}
+
+.calc-examples button:hover {
+  background: #eff6ff;
+}
+
+.calc-examples strong {
+  color: #1d4ed8;
+  font-size: 12px;
+}
+
+.calc-examples code {
+  color: #334155;
+  font-size: 11.5px;
+  overflow-wrap: anywhere;
+}
+
+.calc-block-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.help-dialog-body code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #f1f5f9;
+  color: #172033;
+  font-size: 12.5px;
+}
+
+.help-dialog-body p {
+  margin: 0 0 10px;
+}

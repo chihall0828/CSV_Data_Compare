@@ -40,7 +40,8 @@ import {
   summarizeXValuesFromRows,
   unionColumns
 } from "./dataUtils.js";
-import { compileFormula, evaluateCompiledFormula, formulaHelpText } from "./formulaUtils.js";
+import { compileFormula, evaluateCompiledFormula } from "./formulaUtils.js";
+import CalculatedColumnsEditor from "./CalculatedColumnsEditor.jsx";
 import { parseXlsxWorkbook, rowsToParsedData } from "./xlsxUtils.js";
 import StatisticsPanel from "./StatisticsPanel.jsx";
 import {
@@ -1708,20 +1709,6 @@ export default function App() {
     updateDataset(id, patch);
   }
 
-  function insertColumnReference(id, column) {
-    setDatasets((current) =>
-      current.map((dataset) => {
-        if (dataset.id !== id) return dataset;
-        const currentFormula = dataset.calculationFormula ?? "";
-        const separator = currentFormula && !/\s$/.test(currentFormula) ? " " : "";
-        return {
-          ...dataset,
-          calculationFormula: `${currentFormula}${separator}[${column}]`
-        };
-      })
-    );
-  }
-
   function addCalculatedColumn(id) {
     const dataset = datasets.find((item) => item.id === id);
     if (!dataset) return;
@@ -2197,62 +2184,13 @@ export default function App() {
                       ))}
                     </div>
                   )}
-                  <details className="calculated-columns">
-                    <summary>Calculated columns</summary>
-                    <div className="calculation-grid">
-                      <label>
-                        New column name
-                        <input
-                          type="text"
-                          value={dataset.calculationName ?? ""}
-                          onChange={(event) => updateCalculationDraft(dataset.id, { calculationName: event.target.value })}
-                          placeholder="E_error_m"
-                        />
-                      </label>
-                      <label className="formula-field">
-                        Formula
-                        <textarea
-                          value={dataset.calculationFormula ?? ""}
-                          onChange={(event) => updateCalculationDraft(dataset.id, { calculationFormula: event.target.value })}
-                          placeholder="sqrt(([KF_E_m] - [Relative_E_m])^2 + ([KF_N_m] - [Relative_N_m])^2)"
-                        />
-                      </label>
-                    </div>
-                    <p className="field-note">{formulaHelpText()}</p>
-                    <div className="column-insert-list" aria-label="Insert column reference">
-                      {dataset.columns.slice(0, 80).map((column) => (
-                        <button type="button" key={column} onClick={() => insertColumnReference(dataset.id, column)}>
-                          [{column}]
-                        </button>
-                      ))}
-                    </div>
-                    <div className="calculation-actions">
-                      <button
-                        type="button"
-                        onClick={() => addCalculatedColumn(dataset.id)}
-                        disabled={!cleanHeader(dataset.calculationName) || !cleanHeader(dataset.calculationFormula)}
-                      >
-                        Add calculated column
-                      </button>
-                      <button type="button" onClick={() => exportProcessedCsv(dataset)}>
-                        Export processed CSV
-                      </button>
-                    </div>
-                    {(dataset.calculatedColumns ?? []).length > 0 && (
-                      <div className="calculated-list">
-                        {(dataset.calculatedColumns ?? []).map((column) => (
-                          <div key={column.name}>
-                            <strong>{column.name}</strong>
-                            <span>{column.formula}</span>
-                            <small>{column.validCount.toLocaleString()} ok / {column.invalidCount.toLocaleString()} skipped</small>
-                            <button type="button" onClick={() => removeCalculatedColumn(dataset.id, column.name)}>
-                              Delete
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </details>
+                  <CalculatedColumnsEditor
+                    dataset={dataset}
+                    onDraftChange={(patch) => updateCalculationDraft(dataset.id, patch)}
+                    onAdd={() => addCalculatedColumn(dataset.id)}
+                    onExport={() => exportProcessedCsv(dataset)}
+                    onRemove={(column) => removeCalculatedColumn(dataset.id, column)}
+                  />
                   {diagnostic && (
                     <details className="diagnostics">
                       <summary>診断情報</summary>

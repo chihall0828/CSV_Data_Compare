@@ -10,6 +10,8 @@ import {
   formatStatValue
 } from "./statisticsUtils.js";
 import HypothesisTestSection from "./HypothesisTestSection.jsx";
+import { HelpButton, HelpDialog } from "./HelpDialog.jsx";
+import { UnivariateHelpContent, BivariateHelpContent } from "./statisticsHelpContent.jsx";
 
 const SAMPLE_MODES = [
   { value: "all", label: "All filtered rows" },
@@ -46,6 +48,7 @@ export default function StatisticsPanel({ datasets }) {
   const [result, setResult] = useState(null);
   const [computeError, setComputeError] = useState("");
   const [collapsed, setCollapsed] = useState(false);
+  const [openHelp, setOpenHelp] = useState(null);
 
   const activeDataset =
     (datasetId ? datasets.find((d) => d.id === datasetId) : null) ?? datasets[0] ?? null;
@@ -147,18 +150,42 @@ export default function StatisticsPanel({ datasets }) {
 
   return (
     <section className="panel statistics-panel">
-      <button
-        type="button"
-        className="stats-toggle"
-        onClick={() => setCollapsed((c) => !c)}
-        aria-expanded={!collapsed}
+      <div className="stats-header-row">
+        <button
+          type="button"
+          className="stats-toggle"
+          onClick={() => setCollapsed((c) => !c)}
+          aria-expanded={!collapsed}
+        >
+          <div className="section-heading">
+            <h2>Statistics</h2>
+            <BarChart3 size={18} />
+          </div>
+          <span className="stats-toggle-arrow">{collapsed ? "▸" : "▾"}</span>
+        </button>
+        <HelpButton
+          open={openHelp === "univariate"}
+          onToggle={() => setOpenHelp(openHelp === "univariate" ? null : "univariate")}
+          dialogId="univariate-help-dialog"
+          label="統計量の見方ヘルプを開く"
+        />
+      </div>
+      <HelpDialog
+        open={openHelp === "univariate"}
+        onClose={() => setOpenHelp(null)}
+        dialogId="univariate-help-dialog"
+        title="統計量の見方"
       >
-        <div className="section-heading">
-          <h2>Statistics</h2>
-          <BarChart3 size={18} />
-        </div>
-        <span className="stats-toggle-arrow">{collapsed ? "▸" : "▾"}</span>
-      </button>
+        <UnivariateHelpContent />
+      </HelpDialog>
+      <HelpDialog
+        open={openHelp === "bivariate"}
+        onClose={() => setOpenHelp(null)}
+        dialogId="bivariate-help-dialog"
+        title="2変数統計（Bivariate statistics）の見方"
+      >
+        <BivariateHelpContent />
+      </HelpDialog>
 
       {!collapsed && (
         <div className="stats-body">
@@ -194,7 +221,15 @@ export default function StatisticsPanel({ datasets }) {
                   </select>
                 </label>
 
-                <div className="stats-form-heading">Bivariate statistics</div>
+                <div className="stats-form-heading">
+                  Bivariate statistics
+                  <HelpButton
+                    open={openHelp === "bivariate"}
+                    onToggle={() => setOpenHelp(openHelp === "bivariate" ? null : "bivariate")}
+                    dialogId="bivariate-help-dialog"
+                    label="2変数統計の見方ヘルプを開く"
+                  />
+                </div>
 
                 <label className="field">
                   <span>Column A</span>
