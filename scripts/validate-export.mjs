@@ -1,4 +1,6 @@
 import {
+  buildLlmPayload,
+  LLM_PAYLOAD_SCHEMA_VERSION,
   safeFileSlug,
   dateStamp,
   buildStatisticsExportPayload,
@@ -199,6 +201,63 @@ assert(
   statisticsPayloadToMarkdown(jaPayload).includes("- Dataset: 実験 データ#1.xlsx"),
   "stats md preserves Japanese dataset name"
 );
+
+// ---- LLM payload (Phase L1) ----
+
+// Built from Export JSON: statistics + hypothesis results together
+const llmPayload = buildLlmPayload([statsPayload, hypPayload], { userNote: "block条件は遮蔽実験" });
+assert(llmPayload.schemaVersion === LLM_PAYLOAD_SCHEMA_VERSION, "llm schemaVersion");
+assert(llmPayload.task === "interpretation", "llm task");
+assert(llmPayload.language === "ja", "llm default language ja");
+assert(buildLlmPayload(statsPayload, { language: "en" }).language === "en", "llm language en option");
+assert(llmPayload.results.length === 2, "llm results length");
+assert(llmPayload.userNote === "block条件は遮蔽実験", "llm userNote preserved");
+assert(typeof llmPayload.generatedAt === "string" && llmPayload.generatedAt.includes("T"), "llm generatedAt ISO");
+
+// Single (non-array) input is wrapped
+assert(buildLlmPayload(statsPayload).results.length === 1, "llm single input wrapped");
+
+// Summary values survive sanitization
+const llmStats = llmPayload.results[0];
+assert(llmStats.univariate.mean === 1.5, "llm stats mean survives");
+assert(llmStats.bivariate.pearsonCorrelation === 0.9, "llm stats pearson survives");
+assert(llmStats.sample.rowsAfterFilter === 440, "llm stats sample rows survive");
+const llmHyp = llmPayload.results[1];
+assert(llmHyp.result.pValue === 0.0805, "llm hyp pValue survives");
+assert(llmHyp.result.alpha === 0.05, "llm hyp alpha survives");
+assert(llmHyp.result.significant === false, "llm hyp significant survives");
+assert(llmHyp.cautions.length === 2, "llm hyp cautions survive");
+assert(llmHyp.sampleB.group === "condition = block", "llm hyp group survives");
+
+// Whitelist: raw-data-like extra fields must be stripped, never forwarded
+const poisoned = {
+  ...statsPayload,
+  rows: [[1, 2, 3]],
+  rawData: "secret",
+  univariate: { ...statsPayload.univariate, cells: [1, 2, 3] }
+};
+const llmClean = buildLlmPayload(poisoned).results[0];
+const llmCleanJson = JSON.stringify(llmClean);
+assert(!("rows" in llmClean), "llm strips top-level rows");
+assert(!llmCleanJson.includes("rawData") && !llmCleanJson.includes("secret"), "llm strips rawData");
+assert(!llmCleanJson.includes("cells"), "llm strips nested unknown keys");
+assert(llmClean.univariate.mean === 1.5, "llm keeps whitelisted values after stripping");
+
+// Non-string cautions are filtered out
+const mixedCautions = buildLlmPayload({ ...hypPayload, cautions: ["ok", 42, null, "also ok"] }).results[0];
+assert(mixedCautions.cautions.length === 2, "llm filters non-string cautions");
+
+// userNote is clamped to 2000 chars and non-strings become empty
+assert(buildLlmPayload(statsPayload, { userNote: "x".repeat(3000) }).userNote.length === 2000, "llm userNote clamp");
+assert(buildLlmPayload(statsPayload, { userNote: 123 }).userNote === "", "llm non-string userNote empty");
+
+// Unsupported exportType and empty input must throw
+let threwUnknown = false;
+try { buildLlmPayload({ exportType: "raw-rows", rows: [] }); } catch { threwUnknown = true; }
+assert(threwUnknown, "llm throws on unsupported exportType");
+let threwEmpty = false;
+try { buildLlmPayload([]); } catch { threwEmpty = true; }
+assert(threwEmpty, "llm throws on empty results");
 
 // ---- report ----
 if (failures.length === 0) {

@@ -218,3 +218,137 @@ export function hypothesisPayloadToMarkdown(payload) {
   lines.push("");
   return lines.join("\n");
 }
+
+/* ── LLM payload (Phase L1) ─────────────────────────────────────────────
+ * Builds the payload sent to a local LLM (Ollama) from Export JSON results.
+ * Whitelist-based: only the keys listed below can appear in the output, so
+ * raw rows/cell values can never leak into the payload even if the input
+ * object carries extra fields. Pure function — performs no network I/O.
+ */
+
+export const LLM_PAYLOAD_SCHEMA_VERSION = 1;
+
+const LLM_MAX_USER_NOTE_LENGTH = 2000;
+
+function pickNumberOrNull(value) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function pickCountOrNull(value) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function pickStringOrNull(value) {
+  return typeof value === "string" && value !== "" ? value : null;
+}
+
+function sanitizeSampleDescriptor(sample) {
+  if (!sample || typeof sample !== "object") return null;
+  return {
+    dataset: pickStringOrNull(sample.dataset),
+    column: pickStringOrNull(sample.column),
+    group: pickStringOrNull(sample.group)
+  };
+}
+
+function sanitizeStatisticsResult(result) {
+  const sample = result.sample ?? {};
+  const univariate = result.univariate ?? {};
+  const bivariate = result.bivariate;
+  return {
+    exportType: "statistics-result",
+    dataset: pickStringOrNull(result.dataset),
+    column: pickStringOrNull(result.column),
+    sample: {
+      mode: pickStringOrNull(sample.mode) ?? "all",
+      n: pickCountOrNull(sample.n),
+      seed: pickCountOrNull(sample.seed),
+      start: pickCountOrNull(sample.start),
+      end: pickCountOrNull(sample.end),
+      rowsAfterFilter: pickCountOrNull(sample.rowsAfterFilter),
+      rowsInSample: pickCountOrNull(sample.rowsInSample)
+    },
+    univariate: {
+      count: pickCountOrNull(univariate.count),
+      missing: pickCountOrNull(univariate.missing),
+      mean: pickNumberOrNull(univariate.mean),
+      variance: pickNumberOrNull(univariate.variance),
+      stddev: pickNumberOrNull(univariate.stddev),
+      min: pickNumberOrNull(univariate.min),
+      max: pickNumberOrNull(univariate.max),
+      median: pickNumberOrNull(univariate.median)
+    },
+    bivariate: bivariate
+      ? {
+          columnA: pickStringOrNull(bivariate.columnA),
+          columnB: pickStringOrNull(bivariate.columnB),
+          validPairCount: pickCountOrNull(bivariate.validPairCount),
+          excludedPairs: pickCountOrNull(bivariate.excludedPairs),
+          covariance: pickNumberOrNull(bivariate.covariance),
+          pearsonCorrelation: pickNumberOrNull(bivariate.pearsonCorrelation),
+          rSquared: pickNumberOrNull(bivariate.rSquared)
+        }
+      : null
+  };
+}
+
+function sanitizeHypothesisResult(result) {
+  const r = result.result ?? {};
+  return {
+    exportType: "hypothesis-test-result",
+    testName: pickStringOrNull(result.testName),
+    sampleA: sanitizeSampleDescriptor(result.sampleA),
+    sampleB: sanitizeSampleDescriptor(result.sampleB),
+    alternative: pickStringOrNull(result.alternative),
+    result: {
+      nA: pickCountOrNull(r.nA),
+      nB: pickCountOrNull(r.nB),
+      meanA: pickNumberOrNull(r.meanA),
+      meanB: pickNumberOrNull(r.meanB),
+      varianceA: pickNumberOrNull(r.varianceA),
+      varianceB: pickNumberOrNull(r.varianceB),
+      statistic: pickNumberOrNull(r.statistic),
+      degreesOfFreedom:
+        typeof r.degreesOfFreedom === "string"
+          ? r.degreesOfFreedom
+          : pickNumberOrNull(r.degreesOfFreedom),
+      pValue: pickNumberOrNull(r.pValue),
+      alpha: pickNumberOrNull(r.alpha),
+      significant: typeof r.significant === "boolean" ? r.significant : null,
+      meanDifference: pickNumberOrNull(r.meanDifference),
+      effectSize: pickNumberOrNull(r.effectSize)
+    },
+    cautions: Array.isArray(result.cautions)
+      ? result.cautions.filter((item) => typeof item === "string")
+      : []
+  };
+}
+
+export function buildLlmPayload(results, options = {}) {
+  const list = Array.isArray(results) ? results : [results];
+  const sanitized = list.map((result) => {
+    if (!result || typeof result !== "object") {
+      throw new Error("LLM payload input must be an export result object.");
+    }
+    if (result.exportType === "statistics-result") return sanitizeStatisticsResult(result);
+    if (result.exportType === "hypothesis-test-result") return sanitizeHypothesisResult(result);
+    throw new Error(`Unsupported exportType for LLM payload: ${String(result.exportType)}`);
+  });
+  if (sanitized.length === 0) {
+    throw new Error("LLM payload requires at least one export result.");
+  }
+
+  const userNote = typeof options.userNote === "string"
+    ? options.userNote.slice(0, LLM_MAX_USER_NOTE_LENGTH)
+    : "";
+
+  return {
+    schemaVersion: LLM_PAYLOAD_SCHEMA_VERSION,
+    app: APP_NAME,
+    generatedAt: new Date().toISOString(),
+    language: options.language === "en" ? "en" : "ja",
+    task: "interpretation",
+    results: sanitized,
+    userNote
+  };
+}
