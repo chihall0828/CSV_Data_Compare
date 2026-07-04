@@ -62,6 +62,8 @@ release/CSVDataCompare-portable.zip
 
 GitHub Pagesでホストしています。URLを開くだけで使えます。インストール・展開は不要です。
 
+公開URL: https://chihall0828.github.io/CSV_Data_Compare/
+
 - **CSV/Excelはサーバーへアップロードされません。** 読み込んだファイルのデータはすべてブラウザ内で処理します。外部サーバーへの送信は一切行いません。
 - ページを閉じると読み込んだCSV/Excelデータは消えます（グラフ設定などlocalStorageに保存した項目は残ります）。
 - `main` ブランチへのpushで自動的に最新版が公開されます（GitHub Actions経由）。
@@ -226,9 +228,27 @@ XY Plotでは、ファイルごとの `XY X` と `XY Y` の列を使って平面
 点が多すぎる、または重なって見える
 : 同じCSVの二重読み込み、選択Y列の増えすぎ、X列の重複が主な原因です。アプリは同一CSVを既定でスキップし、X重複はグラフ上の警告とファイル別診断に表示します。
 
+サンプルボタンを押しても読み込まれない（Consoleに `real-samples` / `test-samples` の404）
+: 配信パスとサンプルパスの不一致が原因です。最新版では修正済みなので、ブラウザをスーパーリロード（Ctrl+Shift+R）して最新のアプリを読み込んでください。Portable版の場合はzipが古い可能性があります（下記参照）。
+
+Consoleに `favicon.ico 404` が出る
+: 旧バージョンの名残です。最新版ではfaviconを同梱しており表示されません。アプリの動作には影響しません。
+
+Portable版に統計・ヘルプ・Exportが表示されない
+: 配布zipが古いバージョンです。最新の `release/CSVDataCompare-portable.zip` を入手し直すか、[docs/portable-release-checklist.md](docs/portable-release-checklist.md) の手順でzipを再生成してください。
+
 ## 統計量パネル（Phase 1）
 
 CSV/Excelを読み込んだ後、画面下部の **Statistics** パネルで選択した列の統計量を計算できます。
+
+各セクション見出し横の丸い **?** ボタンから、初心者向けの日本語ヘルプを開けます。
+
+- **Statistics** の `?`: 各統計量の意味と比較の見方
+- **Bivariate statistics** の `?`: 共分散・相関係数・R²の見方と注意点
+- **Hypothesis Test** の `?`: p-value・alphaの意味、6種の検定の使い分け、判断の流れ
+- **Formula builder** の `?`（Calculated columns内）: 数式の書き方・使える演算子/関数・計算不能行の扱い
+
+ヘルプはEscキー・背景クリック・Closeボタンで閉じられます。
 
 ### 基本操作
 
@@ -339,6 +359,8 @@ npm run package:portable
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/create-portable-package.ps1 -NodePath "node.exeへのパス"
 ```
+
+release再生成の完全な手順・確認項目は [docs/portable-release-checklist.md](docs/portable-release-checklist.md) を参照してください。
 
 ## ファイル構成
 

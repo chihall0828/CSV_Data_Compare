@@ -128,6 +128,78 @@ assert(
   "hyp md one-sample B line"
 );
 
+// ---- filename slug edge cases ----
+assert(safeFileSlug("my data (v2).csv") === "my_data_v2", `slug symbols: got ${safeFileSlug("my data (v2).csv")}`);
+assert(safeFileSlug("a.b.c.csv") === "a_b_c", `slug inner dots: got ${safeFileSlug("a.b.c.csv")}`);
+assert(safeFileSlug("実験 データ#1.xlsx") === "実験_データ_1", `slug ja+symbols: got ${safeFileSlug("実験 データ#1.xlsx")}`);
+assert(safeFileSlug("___") === "dataset", `slug underscores-only fallback: got ${safeFileSlug("___")}`);
+assert(!/[\\/:*?"<>|\s]/.test(safeFileSlug("bad\\/:*?\"<>| name.csv")), "slug must not contain filesystem-unsafe characters");
+
+// ---- payload schema: required keys must always be present ----
+const STATS_REQUIRED_KEYS = ["exportType", "app", "exportedAt", "dataset", "column", "sample", "univariate", "bivariate"];
+const STATS_UNIVARIATE_KEYS = ["count", "missing", "mean", "variance", "stddev", "min", "max", "median"];
+const STATS_SAMPLE_KEYS = ["mode", "rowsAfterFilter", "rowsInSample"];
+for (const key of STATS_REQUIRED_KEYS) {
+  assert(key in statsPayload, `stats payload missing key: ${key}`);
+}
+for (const key of STATS_UNIVARIATE_KEYS) {
+  assert(key in statsPayload.univariate, `stats payload univariate missing key: ${key}`);
+}
+for (const key of STATS_SAMPLE_KEYS) {
+  assert(key in statsPayload.sample, `stats payload sample missing key: ${key}`);
+}
+
+const HYP_REQUIRED_KEYS = ["exportType", "app", "exportedAt", "testName", "sampleA", "sampleB", "alternative", "result", "cautions"];
+const HYP_RESULT_KEYS = [
+  "nA", "nB", "meanA", "meanB", "varianceA", "varianceB",
+  "statistic", "degreesOfFreedom", "pValue", "alpha", "significant", "meanDifference", "effectSize"
+];
+for (const key of HYP_REQUIRED_KEYS) {
+  assert(key in hypPayload, `hyp payload missing key: ${key}`);
+}
+for (const key of HYP_RESULT_KEYS) {
+  assert(key in hypPayload.result, `hyp payload result missing key: ${key}`);
+}
+
+// Core judgement values must never be dropped even when optional stats are null
+const hypNulls = buildHypothesisExportPayload(
+  { ...hypResult, nB: null, varianceB: null, meanDiff: null, effectSize: null },
+  hypContext
+);
+assert(hypNulls.result.pValue === 0.0805, "hyp payload keeps pValue with null optionals");
+assert(hypNulls.result.alpha === 0.05, "hyp payload keeps alpha with null optionals");
+assert(hypNulls.result.significant === false, "hyp payload keeps significant with null optionals");
+for (const key of HYP_RESULT_KEYS) {
+  assert(key in hypNulls.result, `hyp payload (null optionals) missing key: ${key}`);
+}
+
+// ---- markdown robustness ----
+// Rendered markdown must never leak raw undefined/NaN text
+const allMd = [
+  statsMd,
+  statisticsPayloadToMarkdown(statsNoBi),
+  hypMd,
+  hypothesisPayloadToMarkdown(hypNulls)
+];
+for (const md of allMd) {
+  assert(!md.includes("undefined"), "markdown must not contain 'undefined'");
+  assert(!/\bNaN\b/.test(md), "markdown must not contain 'NaN'");
+}
+// Null optional values render as the placeholder dash
+const hypNullsMd = hypothesisPayloadToMarkdown(hypNulls);
+assert(hypNullsMd.includes("| Effect size | — |"), "hyp md renders null effect size as dash");
+assert(hypNullsMd.includes("| Sample B n | — |"), "hyp md renders null nB as dash");
+// Judgement values still present
+assert(hypNullsMd.includes("| p-value | 0.0805 |"), "hyp md keeps p-value with null optionals");
+assert(hypNullsMd.includes("| Alpha | 0.05 |"), "hyp md keeps alpha with null optionals");
+
+// Dataset names with Japanese/symbols flow through markdown unescaped-but-intact
+const jaPayload = buildStatisticsExportPayload({ ...statsResult, datasetName: "実験 データ#1.xlsx" });
+assert(
+  statisticsPayloadToMarkdown(jaPayload).includes("- Dataset: 実験 データ#1.xlsx"),
+  "stats md preserves Japanese dataset name"
+);
+
 // ---- report ----
 if (failures.length === 0) {
   console.log(JSON.stringify({ status: "ok" }));
