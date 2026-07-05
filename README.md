@@ -311,13 +311,11 @@ Statisticsパネルの **Bivariate statistics** セクションでは、**Column
 - ファイル名には結果種別・dataset名・日付が入ります（例: `statistics-result-sample-20260702.json`）。
 - Markdownはそのままレポートに貼り付けられる表形式です。
 
-### Phase 1 の制限
+### 実装状況
 
-Phase 1/2 では以下は未対応です。将来のPhaseで追加予定です。
-
-- 仮説検定（t検定・F検定など）(→ Phase 3)
-- 統計結果のエクスポート (→ Phase 4)
-- LLMによる読み取り候補の提案 (→ Phase 5)
+- 仮説検定（1標本/2標本t検定・Welch・対応あり・F検定・相関の有意性検定） — 実装済み（下記「仮説検定パネル」参照）
+- 統計結果のエクスポート（JSON/Markdown） — 実装済み（上記「統計結果のExport」参照）
+- LLMによる読み取り候補の提案 — 未実装。設計・payload形式のみ [docs/llm-payload-design.md](docs/llm-payload-design.md) と [Issue #26](https://github.com/chihall0828/CSV_Data_Compare/issues/26) で先行整備済み。`buildLlmPayload()`（`src/exportUtils.js`）は既存のExport結果を要約payload化する純関数で、UIや実際のLLM呼び出しはまだ接続していません。
 
 ## 開発者向け
 
