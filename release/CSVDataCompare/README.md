@@ -62,6 +62,8 @@ release/CSVDataCompare-portable.zip
 
 GitHub Pagesでホストしています。URLを開くだけで使えます。インストール・展開は不要です。
 
+公開URL: https://chihall0828.github.io/CSV_Data_Compare/
+
 - **CSV/Excelはサーバーへアップロードされません。** 読み込んだファイルのデータはすべてブラウザ内で処理します。外部サーバーへの送信は一切行いません。
 - ページを閉じると読み込んだCSV/Excelデータは消えます（グラフ設定などlocalStorageに保存した項目は残ります）。
 - `main` ブランチへのpushで自動的に最新版が公開されます（GitHub Actions経由）。
@@ -226,9 +228,27 @@ XY Plotでは、ファイルごとの `XY X` と `XY Y` の列を使って平面
 点が多すぎる、または重なって見える
 : 同じCSVの二重読み込み、選択Y列の増えすぎ、X列の重複が主な原因です。アプリは同一CSVを既定でスキップし、X重複はグラフ上の警告とファイル別診断に表示します。
 
+サンプルボタンを押しても読み込まれない（Consoleに `real-samples` / `test-samples` の404）
+: 配信パスとサンプルパスの不一致が原因です。最新版では修正済みなので、ブラウザをスーパーリロード（Ctrl+Shift+R）して最新のアプリを読み込んでください。Portable版の場合はzipが古い可能性があります（下記参照）。
+
+Consoleに `favicon.ico 404` が出る
+: 旧バージョンの名残です。最新版ではfaviconを同梱しており表示されません。アプリの動作には影響しません。
+
+Portable版に統計・ヘルプ・Exportが表示されない
+: 配布zipが古いバージョンです。最新の `release/CSVDataCompare-portable.zip` を入手し直すか、[docs/portable-release-checklist.md](docs/portable-release-checklist.md) の手順でzipを再生成してください。
+
 ## 統計量パネル（Phase 1）
 
 CSV/Excelを読み込んだ後、画面下部の **Statistics** パネルで選択した列の統計量を計算できます。
+
+各セクション見出し横の丸い **?** ボタンから、初心者向けの日本語ヘルプを開けます。
+
+- **Statistics** の `?`: 各統計量の意味と比較の見方
+- **Bivariate statistics** の `?`: 共分散・相関係数・R²の見方と注意点
+- **Hypothesis Test** の `?`: p-value・alphaの意味、6種の検定の使い分け、判断の流れ
+- **Formula builder** の `?`（Calculated columns内）: 数式の書き方・使える演算子/関数・計算不能行の扱い
+
+ヘルプはEscキー・背景クリック・Closeボタンで閉じられます。
 
 ### 基本操作
 
@@ -282,13 +302,33 @@ Statisticsパネルの **Bivariate statistics** セクションでは、**Column
 - 有効ペア数が2未満の場合、共分散・相関係数・R²は計算しません。
 - 片方の列の分散が0の場合、相関係数とR²は計算しません。
 
-### Phase 1 の制限
+### 統計結果のExport
 
-Phase 1/2 では以下は未対応です。将来のPhaseで追加予定です。
+計算した統計結果は、後からレポートや研究資料に使える形で保存できます。
 
-- 仮説検定（t検定・F検定など）(→ Phase 3)
-- 統計結果のエクスポート (→ Phase 4)
-- LLMによる読み取り候補の提案 (→ Phase 5)
+- **Export statistics JSON** / **Export statistics Markdown** — Statistics結果の下に表示されます。単変量統計と2変量統計、サンプル条件（Sample mode・行数）を含みます。
+- **Export hypothesis JSON** / **Export hypothesis Markdown** — Hypothesis Test結果の下に表示されます。検定名、Sample A/B（dataset・column・group）、statistic、自由度、p-value、alpha、判定、効果量、注意文を含みます。
+- ファイル名には結果種別・dataset名・日付が入ります（例: `statistics-result-sample-20260702.json`）。
+- Markdownはそのままレポートに貼り付けられる表形式です。
+
+### AI interpretation（実験的・任意機能・Phase L2）
+
+Statisticsパネル最下部の **AI interpretation (optional)** から、ローカルPCで動く [Ollama](https://ollama.com) への接続を設定できます。
+
+- デフォルトで無効（`Use local Ollama` チェックボックスOFF）です。有効にしない限り、この機能は一切通信しません。
+- **現時点では接続確認のみ**です。統計結果の送信・AIによる考察生成はまだ実装していません（今後のPhaseで追加予定）。
+- **Ollama endpoint は `http://localhost` または `http://127.0.0.1` のみ指定できます。** それ以外のURLはブラウザ側で拒否され、外部サーバーへ通信することはありません。
+- 事前に [Ollama](https://ollama.com) をインストールし、モデルを取得しておく必要があります（例: `ollama pull llama3.2`）。
+- Web版（GitHub Pages）から接続する場合、Ollama起動時に `OLLAMA_ORIGINS` の設定が必要な場合があります。うまく接続できない場合はPortable版（localhost配信）でお試しください。
+- 設定（endpoint・モデル名・timeout・有効/無効）だけがブラウザに保存されます。**CSV/Excelのデータや統計結果は保存・送信されません。**
+- 設計の詳細は [docs/llm-payload-design.md](docs/llm-payload-design.md) と [docs/phase-l2-ollama-plan.md](docs/phase-l2-ollama-plan.md) を参照してください。
+
+### 実装状況
+
+- 仮説検定（1標本/2標本t検定・Welch・対応あり・F検定・相関の有意性検定） — 実装済み（下記「仮説検定パネル」参照）
+- 統計結果のエクスポート（JSON/Markdown） — 実装済み（上記「統計結果のExport」参照）
+- Ollama接続確認（Phase L2） — 実装済み。接続設定・疎通確認のみ（上記「AI interpretation」参照）
+- LLMによる読み取り候補の提案・考察生成（Phase L3） — 未実装。設計・payload形式のみ [docs/llm-payload-design.md](docs/llm-payload-design.md) と [Issue #26](https://github.com/chihall0828/CSV_Data_Compare/issues/26) で先行整備済み。`buildLlmPayload()`（`src/exportUtils.js`）は既存のExport結果を要約payload化する純関数で、Ollamaへの送信配線はまだ行っていません。
 
 ## 開発者向け
 
@@ -330,6 +370,8 @@ npm run package:portable
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/create-portable-package.ps1 -NodePath "node.exeへのパス"
 ```
+
+release再生成の完全な手順・確認項目は [docs/portable-release-checklist.md](docs/portable-release-checklist.md) を参照してください。
 
 ## ファイル構成
 
