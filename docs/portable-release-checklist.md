@@ -68,6 +68,7 @@ npm run validate
 - [ ] サンプル実データ読込（既存データがある状態では確認モーダル → 置換/追加/中止/Esc が動作すること）
 - [ ] Excelサンプル読込
 - [ ] グラフ描画
+- [ ] PNG保存（`PNGで保存` ボタンでファイルが保存できる。White/Transparent背景・1×/2×/3×解像度のいずれかで確認）
 - [ ] Statistics help（`?`）が開く
 - [ ] Bivariate help が開く
 - [ ] Hypothesis help が開く
@@ -88,11 +89,13 @@ git diff --stat
 - 新しいbranchを作成してcommit・pushし、main向けPRを作成します
 
 ```bash
-git switch -c claude/regenerate-portable-<topic>
+git switch -c claude/regenerate-portable-release
 git add release/
 git commit -m "Regenerate portable release"
-git push -u origin claude/regenerate-portable-<topic>
+git push -u origin claude/regenerate-portable-release
 ```
+
+複数回にわたって再生成する場合は、branch名に日付や理由を足すなどして区別してください（例: `claude/regenerate-portable-release-20260705`）。
 
 ### 9. merge後
 
