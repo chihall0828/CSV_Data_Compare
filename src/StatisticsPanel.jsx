@@ -10,6 +10,7 @@ import {
   formatStatValue
 } from "./statisticsUtils.js";
 import HypothesisTestSection from "./HypothesisTestSection.jsx";
+import OllamaSettings from "./OllamaSettings.jsx";
 import { HelpButton, HelpDialog } from "./HelpDialog.jsx";
 import { UnivariateHelpContent, BivariateHelpContent } from "./statisticsHelpContent.jsx";
 import {
@@ -468,6 +469,7 @@ export default function StatisticsPanel({ datasets }) {
             </>
           )}
           <HypothesisTestSection datasets={datasets} />
+          <OllamaSettings />
         </div>
       )}
     </section>
