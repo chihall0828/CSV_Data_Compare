@@ -76,9 +76,115 @@ export function writeOllamaSettings(settings) {
   return safe;
 }
 
-// The only function in this module that performs network I/O. Takes just an
-// endpoint and a timeout — it cannot accept dataset/rows, so summary
-// statistics or raw CSV data can never be routed through a connection check.
+// System prompt for interpretation generation (Phase L3). Matches the
+// template in docs/llm-payload-design.md: interpret the summary only, never
+// invent numbers, always disclose this is AI-generated reference material.
+export const LLM_SYSTEM_PROMPT =
+  "あなたは統計解析の補助者です。与えられた要約統計・検定結果だけに基づいて、" +
+  "(1) 結果の読み方 (2) 比較ポイント (3) 注意点 (4) 考察のたたき台 を日本語で簡潔に書いてください。" +
+  "数値の捏造をしない・p値だけで断定しない・効果量とサンプルサイズに言及する・" +
+  "「これはAI生成の参考情報であり最終判断はユーザーが行う」と末尾に明記する、を必ず守ってください。";
+
+const LLM_ALLOWED_RESULT_TYPES = new Set(["statistics-result", "hypothesis-test-result"]);
+
+// Keys that would indicate raw row data leaking into a payload. Defense in
+// depth on top of buildLlmPayload()'s whitelist sanitization: this function
+// is the last checkpoint before anything leaves the browser.
+const LLM_FORBIDDEN_PAYLOAD_KEYS = new Set([
+  "rows", "rawrows", "rawdata", "csv", "rawcsv", "cells", "coordinates", "coords"
+]);
+
+const LLM_PAYLOAD_MAX_CHARS = 20000;
+
+// Throws if the payload doesn't look like a buildLlmPayload() output, is
+// suspiciously large, or contains any key associated with raw row data.
+export function assertLlmPayloadSafe(payload) {
+  if (!payload || typeof payload !== "object") {
+    throw new Error("LLM payload must be an object.");
+  }
+  if (payload.task !== "interpretation" || !Array.isArray(payload.results) || payload.results.length === 0) {
+    throw new Error("LLM payload has an unexpected shape.");
+  }
+  for (const result of payload.results) {
+    if (!LLM_ALLOWED_RESULT_TYPES.has(result?.exportType)) {
+      throw new Error(`LLM payload contains an unsupported result type: ${String(result?.exportType)}`);
+    }
+  }
+  const serialized = JSON.stringify(payload);
+  if (serialized.length > LLM_PAYLOAD_MAX_CHARS) {
+    throw new Error("LLM payload is unexpectedly large; refusing to send.");
+  }
+  (function walk(value) {
+    if (!value || typeof value !== "object") return;
+    for (const [key, val] of Object.entries(value)) {
+      if (LLM_FORBIDDEN_PAYLOAD_KEYS.has(key.toLowerCase())) {
+        throw new Error(`LLM payload safety check failed: forbidden key "${key}".`);
+      }
+      walk(val);
+    }
+  })(payload);
+  return true;
+}
+
+// One of only two functions in this module that perform network I/O. Takes
+// endpoint/model/timeout plus an already-sanitized buildLlmPayload() output —
+// it has no way to accept dataset/rows, and re-validates the payload itself
+// (assertLlmPayloadSafe) before ever building the request body.
+export async function generateInterpretation(endpoint, model, timeoutSeconds, payload) {
+  if (!isLocalOllamaEndpoint(endpoint)) {
+    return { ok: false, reason: "invalid_endpoint" };
+  }
+  if (typeof model !== "string" || model.trim() === "") {
+    return { ok: false, reason: "missing_model" };
+  }
+  try {
+    assertLlmPayloadSafe(payload);
+  } catch (error) {
+    return { ok: false, reason: "unsafe_payload", message: String(error?.message ?? error) };
+  }
+
+  const timeoutMs = clampOllamaTimeoutSeconds(timeoutSeconds) * 1000;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(`${endpoint.replace(/\/$/, "")}/api/chat`, {
+      method: "POST",
+      signal: controller.signal,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model,
+        stream: false,
+        messages: [
+          { role: "system", content: LLM_SYSTEM_PROMPT },
+          { role: "user", content: JSON.stringify(payload, null, 2) }
+        ]
+      })
+    });
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => null);
+      const message = typeof errorBody?.error === "string" ? errorBody.error : null;
+      return { ok: false, reason: "http_error", status: response.status, message };
+    }
+    const data = await response.json().catch(() => null);
+    const text = data?.message?.content;
+    if (typeof text !== "string" || text.trim() === "") {
+      return { ok: false, reason: "malformed_response" };
+    }
+    return { ok: true, text };
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      return { ok: false, reason: "timeout" };
+    }
+    return { ok: false, reason: "network_error" };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// The only function in this module that performs network I/O for connection
+// checks. Takes just an endpoint and a timeout — it cannot accept
+// dataset/rows, so summary statistics or raw CSV data can never be routed
+// through a connection check.
 export async function checkOllamaConnection(endpoint, timeoutSeconds) {
   if (!isLocalOllamaEndpoint(endpoint)) {
     return { ok: false, reason: "invalid_endpoint" };

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { applyRowFilter } from "./dataUtils.js";
 import { extractNumericPairs, extractNumericValues, formatStatValue } from "./statisticsUtils.js";
 import {
@@ -98,7 +98,7 @@ function HypResultRow({ label, value, formatted }) {
   );
 }
 
-export default function HypothesisTestSection({ datasets }) {
+export default function HypothesisTestSection({ datasets, onResultChange }) {
   const [testType, setTestType] = useState("welch_t");
   const [aDatasetId, setADatasetId] = useState("");
   const [aColumn, setAColumn] = useState("");
@@ -117,6 +117,10 @@ export default function HypothesisTestSection({ datasets }) {
   const [runError, setRunError] = useState("");
   const [collapsed, setCollapsed] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+
+  useEffect(() => {
+    onResultChange?.(result && exportContext ? { result, exportContext } : null);
+  }, [result, exportContext, onResultChange]);
 
   if (!datasets || datasets.length === 0) return null;
 

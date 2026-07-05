@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { BarChart3 } from "lucide-react";
 import { applyRowFilter } from "./dataUtils.js";
 import {
@@ -15,6 +15,7 @@ import { HelpButton, HelpDialog } from "./HelpDialog.jsx";
 import { UnivariateHelpContent, BivariateHelpContent } from "./statisticsHelpContent.jsx";
 import {
   buildStatisticsExportPayload,
+  buildHypothesisExportPayload,
   statisticsPayloadToMarkdown,
   downloadTextFile,
   safeFileSlug,
@@ -57,6 +58,23 @@ export default function StatisticsPanel({ datasets }) {
   const [computeError, setComputeError] = useState("");
   const [collapsed, setCollapsed] = useState(false);
   const [openHelp, setOpenHelp] = useState(null);
+  const [hypothesisState, setHypothesisState] = useState(null);
+
+  const handleHypothesisResultChange = useCallback((next) => {
+    setHypothesisState(next);
+  }, []);
+
+  const statisticsPayload = useMemo(
+    () => (result ? buildStatisticsExportPayload(result) : null),
+    [result]
+  );
+  const hypothesisPayload = useMemo(
+    () =>
+      hypothesisState
+        ? buildHypothesisExportPayload(hypothesisState.result, hypothesisState.exportContext)
+        : null,
+    [hypothesisState]
+  );
 
   const activeDataset =
     (datasetId ? datasets.find((d) => d.id === datasetId) : null) ?? datasets[0] ?? null;
@@ -468,8 +486,8 @@ export default function StatisticsPanel({ datasets }) {
               )}
             </>
           )}
-          <HypothesisTestSection datasets={datasets} />
-          <OllamaSettings />
+          <HypothesisTestSection datasets={datasets} onResultChange={handleHypothesisResultChange} />
+          <OllamaSettings statisticsPayload={statisticsPayload} hypothesisPayload={hypothesisPayload} />
         </div>
       )}
     </section>
