@@ -311,11 +311,24 @@ Statisticsパネルの **Bivariate statistics** セクションでは、**Column
 - ファイル名には結果種別・dataset名・日付が入ります（例: `statistics-result-sample-20260702.json`）。
 - Markdownはそのままレポートに貼り付けられる表形式です。
 
+### AI interpretation（実験的・任意機能・Phase L2）
+
+Statisticsパネル最下部の **AI interpretation (optional)** から、ローカルPCで動く [Ollama](https://ollama.com) への接続を設定できます。
+
+- デフォルトで無効（`Use local Ollama` チェックボックスOFF）です。有効にしない限り、この機能は一切通信しません。
+- **現時点では接続確認のみ**です。統計結果の送信・AIによる考察生成はまだ実装していません（今後のPhaseで追加予定）。
+- **Ollama endpoint は `http://localhost` または `http://127.0.0.1` のみ指定できます。** それ以外のURLはブラウザ側で拒否され、外部サーバーへ通信することはありません。
+- 事前に [Ollama](https://ollama.com) をインストールし、モデルを取得しておく必要があります（例: `ollama pull llama3.2`）。
+- Web版（GitHub Pages）から接続する場合、Ollama起動時に `OLLAMA_ORIGINS` の設定が必要な場合があります。うまく接続できない場合はPortable版（localhost配信）でお試しください。
+- 設定（endpoint・モデル名・timeout・有効/無効）だけがブラウザに保存されます。**CSV/Excelのデータや統計結果は保存・送信されません。**
+- 設計の詳細は [docs/llm-payload-design.md](docs/llm-payload-design.md) と [docs/phase-l2-ollama-plan.md](docs/phase-l2-ollama-plan.md) を参照してください。
+
 ### 実装状況
 
 - 仮説検定（1標本/2標本t検定・Welch・対応あり・F検定・相関の有意性検定） — 実装済み（下記「仮説検定パネル」参照）
 - 統計結果のエクスポート（JSON/Markdown） — 実装済み（上記「統計結果のExport」参照）
-- LLMによる読み取り候補の提案 — 未実装。設計・payload形式のみ [docs/llm-payload-design.md](docs/llm-payload-design.md) と [Issue #26](https://github.com/chihall0828/CSV_Data_Compare/issues/26) で先行整備済み。`buildLlmPayload()`（`src/exportUtils.js`）は既存のExport結果を要約payload化する純関数で、UIや実際のLLM呼び出しはまだ接続していません。
+- Ollama接続確認（Phase L2） — 実装済み。接続設定・疎通確認のみ（上記「AI interpretation」参照）
+- LLMによる読み取り候補の提案・考察生成（Phase L3） — 未実装。設計・payload形式のみ [docs/llm-payload-design.md](docs/llm-payload-design.md) と [Issue #26](https://github.com/chihall0828/CSV_Data_Compare/issues/26) で先行整備済み。`buildLlmPayload()`（`src/exportUtils.js`）は既存のExport結果を要約payload化する純関数で、Ollamaへの送信配線はまだ行っていません。
 
 ## 開発者向け
 

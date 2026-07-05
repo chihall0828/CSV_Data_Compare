@@ -10,7 +10,7 @@
     "build:portable": "vite build",
     "preview": "vite preview",
     "generate:test-samples": "node scripts/generate-test-samples.mjs",
-    "validate": "npm run validate:data-utils && npm run validate:statistics && npm run validate:export && npm run validate:plot-style && npm run validate:real && npm run validate:excel && npm run validate:portable-release",
+    "validate": "npm run validate:data-utils && npm run validate:statistics && npm run validate:export && npm run validate:ollama-config && npm run validate:plot-style && npm run validate:real && npm run validate:excel && npm run validate:portable-release",
     "validate:data-utils": "node scripts/validate-data-utils.mjs",
     "validate:statistics": "node scripts/validate-statistics.mjs",
     "validate:export": "node scripts/validate-export.mjs",
@@ -19,7 +19,8 @@
     "validate:excel": "node scripts/validate-excel-and-calculation.mjs",
     "validate:pages-build": "node scripts/validate-pages-build.mjs",
     "validate:portable-release": "node scripts/validate-portable-release.mjs",
-    "package:portable": "powershell -ExecutionPolicy Bypass -File scripts/create-portable-package.ps1"
+    "package:portable": "powershell -ExecutionPolicy Bypass -File scripts/create-portable-package.ps1",
+    "validate:ollama-config": "node scripts/validate-ollama-config.mjs"
   },
   "dependencies": {
     "chart.js": "^4.5.1",
