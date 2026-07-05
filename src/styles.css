@@ -1699,3 +1699,57 @@ td.num {
   color: #b45309;
   font-weight: 600;
 }
+
+/* ── Ollama interpretation generation (Phase L3) ─────────────────────── */
+
+.ollama-generate {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px dashed #d1d5db;
+}
+
+.ollama-result {
+  margin-top: 0.75rem;
+}
+
+.ollama-result-disclaimer {
+  font-size: 0.8rem;
+  color: #6b7280;
+  font-style: italic;
+  margin: 0 0 0.5rem;
+}
+
+.ollama-result-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0.75rem;
+  font-size: 0.85rem;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.ollama-payload-preview {
+  margin-top: 0.75rem;
+  font-size: 0.8rem;
+}
+
+.ollama-payload-preview summary {
+  cursor: pointer;
+  color: #374151;
+  font-weight: 600;
+}
+
+.ollama-payload-preview pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0.75rem;
+  margin-top: 0.5rem;
+  max-height: 300px;
+  overflow-y: auto;
+}

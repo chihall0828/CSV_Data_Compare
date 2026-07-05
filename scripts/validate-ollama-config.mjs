@@ -2,8 +2,11 @@ import {
   isLocalOllamaEndpoint,
   clampOllamaTimeoutSeconds,
   DEFAULT_OLLAMA_TIMEOUT_SECONDS,
-  MIN_OLLAMA_TIMEOUT_SECONDS
+  MIN_OLLAMA_TIMEOUT_SECONDS,
+  LLM_SYSTEM_PROMPT,
+  assertLlmPayloadSafe
 } from "../src/ollamaUtils.js";
+import { buildLlmPayload, buildStatisticsExportPayload } from "../src/exportUtils.js";
 
 const failures = [];
 
@@ -46,6 +49,83 @@ assert(clampOllamaTimeoutSeconds(999) === 60, "clamp: above maximum -> 60");
 assert(clampOllamaTimeoutSeconds("abc") === DEFAULT_OLLAMA_TIMEOUT_SECONDS, "clamp: non-numeric -> default");
 assert(clampOllamaTimeoutSeconds(null) === MIN_OLLAMA_TIMEOUT_SECONDS, "clamp: null coerces to 0, clamped up to minimum");
 assert(clampOllamaTimeoutSeconds(5.9) === 5, "clamp: fractional value floored");
+
+// ---- LLM system prompt (Phase L3) ----
+assert(typeof LLM_SYSTEM_PROMPT === "string" && LLM_SYSTEM_PROMPT.length > 0, "system prompt is a non-empty string");
+assert(LLM_SYSTEM_PROMPT.includes("AI生成の参考情報"), "system prompt requires the AI-generated disclaimer");
+assert(LLM_SYSTEM_PROMPT.includes("数値の捏造をしない"), "system prompt forbids fabricating numbers");
+
+// ---- assertLlmPayloadSafe (Phase L3 payload safety check) ----
+const sampleStatsResult = {
+  datasetName: "sample.csv",
+  column: "KF_E_m",
+  filteredN: 100,
+  sampledN: 100,
+  missingCount: 0,
+  sampleMode: "all",
+  sampleParams: {},
+  n: 100,
+  mean: 1.5,
+  variance: 2.5,
+  stddev: Math.sqrt(2.5),
+  min: -1,
+  max: 4,
+  median: 1.4,
+  bivariate: null
+};
+const validPayload = buildLlmPayload(buildStatisticsExportPayload(sampleStatsResult));
+
+function assertThrows(fn, message) {
+  try {
+    fn();
+    failures.push(`${message} (did not throw)`);
+  } catch {
+    // expected
+  }
+}
+
+function assertDoesNotThrow(fn, message) {
+  try {
+    fn();
+  } catch (error) {
+    failures.push(`${message} (threw: ${String(error?.message ?? error)})`);
+  }
+}
+
+assertDoesNotThrow(() => assertLlmPayloadSafe(validPayload), "assertLlmPayloadSafe accepts a valid buildLlmPayload() output");
+assertThrows(() => assertLlmPayloadSafe(null), "assertLlmPayloadSafe rejects null");
+assertThrows(() => assertLlmPayloadSafe({}), "assertLlmPayloadSafe rejects empty object");
+assertThrows(() => assertLlmPayloadSafe({ ...validPayload, task: "raw-dump" }), "assertLlmPayloadSafe rejects wrong task");
+assertThrows(() => assertLlmPayloadSafe({ ...validPayload, results: [] }), "assertLlmPayloadSafe rejects empty results");
+assertThrows(
+  () => assertLlmPayloadSafe({ ...validPayload, results: [{ exportType: "raw-rows", rows: [[1, 2]] }] }),
+  "assertLlmPayloadSafe rejects unsupported exportType"
+);
+assertThrows(
+  () =>
+    assertLlmPayloadSafe({
+      ...validPayload,
+      results: [{ ...validPayload.results[0], rows: [[1, 2, 3]] }]
+    }),
+  "assertLlmPayloadSafe rejects a top-level 'rows' key smuggled into a result"
+);
+assertThrows(
+  () =>
+    assertLlmPayloadSafe({
+      ...validPayload,
+      results: [
+        {
+          ...validPayload.results[0],
+          univariate: { ...validPayload.results[0].univariate, rawData: "leaked" }
+        }
+      ]
+    }),
+  "assertLlmPayloadSafe rejects a nested 'rawData' key"
+);
+assertThrows(
+  () => assertLlmPayloadSafe({ ...validPayload, userNote: "x".repeat(25000) }),
+  "assertLlmPayloadSafe rejects an oversized payload"
+);
 
 // ---- report ----
 if (failures.length === 0) {
