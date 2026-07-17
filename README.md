@@ -7,6 +7,9 @@
 - 複数CSVまたはExcel `.xlsx` をドラッグ＆ドロップで読み込み
 - Excelの複数シートをファイルカード内の `Sheet` で切り替え
 - CSVごとに表示ON/OFF、削除、X column、XY X、XY Yを設定
+- CSV内のY列ごとに系列色、散布図の点色、点サイズを個別指定
+- X/Y軸を線形または対数スケールに切り替え
+- PNGの幅・高さと解像度倍率を個別指定
 - `epoch`、`time`、`timestamp`、`relative_time_s`、`時刻` などをX軸候補として推定
 - `KF_E_m`、`KF_N_m`、`KF_U_m`、`Relative_E_m`、`fix_E_rov_m`、`E方向` などをENU列として推定
 - Time Series Plotで複数Y列を重ね描き

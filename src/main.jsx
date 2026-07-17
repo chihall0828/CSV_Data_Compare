@@ -6,6 +6,7 @@ import {
   Chart as ChartJS,
   Legend,
   LinearScale,
+  LogarithmicScale,
   LineElement,
   PointElement,
   Title,
@@ -17,6 +18,7 @@ import "./styles.css";
 ChartJS.register(
   CategoryScale,
   LinearScale,
+  LogarithmicScale,
   PointElement,
   LineElement,
   BarElement,
