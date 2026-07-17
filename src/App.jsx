@@ -73,7 +73,11 @@ const DEFAULT_DISPLAY_SETTINGS = {
   tickFontSize: 12,
   legendFontSize: 12,
   pngBackground: "white",
-  pngScale: 2
+  pngScale: 2,
+  imageWidth: 1200,
+  imageHeight: 700,
+  xScaleType: "linear",
+  yScaleType: "linear"
 };
 
 const LEGEND_MODES = [
@@ -92,6 +96,13 @@ const GRAPH_MODES = [
   { value: "timeseries", label: "Time Series Plot", icon: Layers },
   { value: "enu", label: "XY Plot", icon: Route }
 ];
+
+const AXIS_SCALE_TYPES = [
+  { value: "linear", label: "線形" },
+  { value: "logarithmic", label: "対数" }
+];
+
+const XY_SERIES_STYLE_KEY = "__xy__";
 
 const SERIES_COLORS = [
   "#2563eb",
@@ -189,6 +200,25 @@ function colorForGroupValue(value) {
 
 function lineStyle(index) {
   return DASH_PATTERNS[index % DASH_PATTERNS.length];
+}
+
+function getSeriesStyle(dataset, seriesKey) {
+  const style = dataset.seriesStyles?.[seriesKey];
+  return style && typeof style === "object" ? style : {};
+}
+
+function resolveSeriesStyleColor(dataset, seriesKey, fallbackColor) {
+  return normalizeHexColor(getSeriesStyle(dataset, seriesKey).color) || resolveDatasetColor(dataset, fallbackColor);
+}
+
+function resolveSeriesPointColor(dataset, seriesKey, fallbackColor) {
+  return normalizeHexColor(getSeriesStyle(dataset, seriesKey).pointColor) || resolveSeriesStyleColor(dataset, seriesKey, fallbackColor);
+}
+
+function resolveSeriesPointSize(dataset, seriesKey, fallbackSize) {
+  const value = getSeriesStyle(dataset, seriesKey).pointSize;
+  if (value === null || value === undefined || value === "") return fallbackSize;
+  return clampNumber(value, 1, 30, fallbackSize);
 }
 
 function compactGroupValue(value) {
@@ -329,6 +359,10 @@ function readDisplaySettings() {
       xMax: parsed.xMax ?? "",
       yMin: parsed.yMin ?? "",
       yMax: parsed.yMax ?? "",
+      xScaleType: AXIS_SCALE_TYPES.some((item) => item.value === parsed.xScaleType) ? parsed.xScaleType : DEFAULT_DISPLAY_SETTINGS.xScaleType,
+      yScaleType: AXIS_SCALE_TYPES.some((item) => item.value === parsed.yScaleType) ? parsed.yScaleType : DEFAULT_DISPLAY_SETTINGS.yScaleType,
+      imageWidth: clampNumber(parsed.imageWidth, 480, 3000, DEFAULT_DISPLAY_SETTINGS.imageWidth),
+      imageHeight: clampNumber(parsed.imageHeight, 320, 2200, DEFAULT_DISPLAY_SETTINGS.imageHeight),
       pngBackground: ["white", "transparent"].includes(parsed.pngBackground) ? parsed.pngBackground : DEFAULT_DISPLAY_SETTINGS.pngBackground,
       pngScale: [1, 2, 3].includes(Number(parsed.pngScale)) ? Number(parsed.pngScale) : DEFAULT_DISPLAY_SETTINGS.pngScale
     };
@@ -360,6 +394,7 @@ function applyStoredDatasetSettings(dataset, storedSettings = readDatasetSetting
   next.rowFilterDraftStart = start ? String(start) : "";
   next.rowFilterDraftEnd = end ? String(end) : "";
   next.enuPreset = saved.enuPreset ?? "";
+  next.seriesStyles = saved.seriesStyles && typeof saved.seriesStyles === "object" ? saved.seriesStyles : {};
   Object.assign(next, plotStyleFromStorage(saved));
   return next;
 }
@@ -505,6 +540,10 @@ export default function App() {
   const [messages, setMessages] = useState([]);
   const [pngBackground, setPngBackground] = useState(initialDisplaySettings.pngBackground ?? DEFAULT_DISPLAY_SETTINGS.pngBackground);
   const [pngScale, setPngScale] = useState(initialDisplaySettings.pngScale ?? DEFAULT_DISPLAY_SETTINGS.pngScale);
+  const [imageWidth, setImageWidth] = useState(initialDisplaySettings.imageWidth ?? DEFAULT_DISPLAY_SETTINGS.imageWidth);
+  const [imageHeight, setImageHeight] = useState(initialDisplaySettings.imageHeight ?? DEFAULT_DISPLAY_SETTINGS.imageHeight);
+  const [xScaleType, setXScaleType] = useState(initialDisplaySettings.xScaleType ?? DEFAULT_DISPLAY_SETTINGS.xScaleType);
+  const [yScaleType, setYScaleType] = useState(initialDisplaySettings.yScaleType ?? DEFAULT_DISPLAY_SETTINGS.yScaleType);
   const [modal, setModal] = useState(null);
   const fileInputRef = useRef(null);
   const settingsInputRef = useRef(null);
@@ -552,6 +591,10 @@ export default function App() {
           axisLabelFontSize,
           tickFontSize,
           legendFontSize,
+          xScaleType,
+          yScaleType,
+          imageWidth,
+          imageHeight,
           pngBackground,
           pngScale
         })
@@ -566,6 +609,8 @@ export default function App() {
     equalScale,
     globalXColumn,
     graphMode,
+    imageHeight,
+    imageWidth,
     legendFontSize,
     legendMode,
     lineWidth,
@@ -578,11 +623,14 @@ export default function App() {
     title,
     titleFontSize,
     xAxisLabel,
+    xScaleType,
     xMax,
     xMin,
     yAxisLabel,
+    yScaleType,
     yMax,
-    yMin
+    yMin,
+    yScaleType
   ]);
 
   useEffect(() => {
@@ -603,6 +651,7 @@ export default function App() {
           visibleGroups: dataset.visibleGroups,
           rowFilter: dataset.rowFilter,
           enuPreset: dataset.enuPreset,
+          seriesStyles: dataset.seriesStyles ?? {},
           ...plotStyle,
           calculatedColumns: dataset.calculatedColumns ?? []
         };
@@ -791,7 +840,10 @@ export default function App() {
 
         groups.forEach((group, groupIndex) => {
           const fallbackColor = dataset.groupColumn ? colorForGroupValue(group.value) : colorForIndex(datasetIndex * 17 + groupIndex);
-          const color = resolveDatasetColor(dataset, fallbackColor);
+          const seriesKey = XY_SERIES_STYLE_KEY;
+          const color = resolveSeriesStyleColor(dataset, seriesKey, fallbackColor);
+          const pointColor = resolveSeriesPointColor(dataset, seriesKey, color);
+          const pointSize = resolveSeriesPointSize(dataset, seriesKey, markerSize);
           const dash = resolveDatasetLineDash(dataset, lineStyle(datasetIndex + groupIndex));
           const points = makeEnuPointsFromRows(group.rows, dataset.eColumn, dataset.nColumn, MAX_POINTS_PER_SERIES);
           if (!points.length) return;
@@ -810,10 +862,12 @@ export default function App() {
             data: points,
             borderColor: color,
             backgroundColor: `${color}26`,
+            pointBackgroundColor: pointColor,
+            pointBorderColor: pointColor,
             borderWidth: lineWidth,
             borderDash: dash,
-            pointRadius: chartType === "scatter" ? markerSize : showPointMarkers ? markerSize : 0,
-            pointHoverRadius: Math.max(markerSize + 2, 5),
+            pointRadius: chartType === "scatter" ? pointSize : showPointMarkers ? pointSize : 0,
+            pointHoverRadius: Math.max(pointSize + 2, 5),
             showLine: chartType !== "scatter",
             tension: 0.15
           });
@@ -826,8 +880,8 @@ export default function App() {
             label: displayTraceLabel(startMeta, legendMode),
             fullLabel: fullTraceLabel(startMeta),
             data: [start],
-            borderColor: color,
-            backgroundColor: color,
+            borderColor: pointColor,
+            backgroundColor: pointColor,
             pointStyle: "triangle",
             pointRadius: endpointMarkerSize,
             pointHoverRadius: endpointMarkerSize + 2,
@@ -837,8 +891,8 @@ export default function App() {
             label: displayTraceLabel(endMeta, legendMode),
             fullLabel: fullTraceLabel(endMeta),
             data: [end],
-            borderColor: color,
-            backgroundColor: color,
+            borderColor: pointColor,
+            backgroundColor: pointColor,
             pointStyle: "rectRot",
             pointRadius: endpointMarkerSize,
             pointHoverRadius: endpointMarkerSize + 2,
@@ -864,7 +918,10 @@ export default function App() {
           const fallbackColor = dataset.groupColumn
             ? colorForGroupValue(group.value)
             : colorForIndex(datasetIndex * Math.max(1, selectedYColumns.length) + columnIndex);
-          const color = resolveDatasetColor(dataset, fallbackColor);
+          const seriesKey = column;
+          const color = resolveSeriesStyleColor(dataset, seriesKey, fallbackColor);
+          const pointColor = resolveSeriesPointColor(dataset, seriesKey, color);
+          const pointSize = resolveSeriesPointSize(dataset, seriesKey, markerSize);
           const dash = resolveDatasetLineDash(dataset, lineStyle(dataset.groupColumn ? columnIndex : groupIndex + columnIndex));
           const traceMeta = {
             fileName: dataset.name,
@@ -878,11 +935,13 @@ export default function App() {
             fullLabel: fullTraceLabel(traceMeta),
             data: points,
             borderColor: color,
-            backgroundColor: `${color}33`,
+            backgroundColor: chartType === "bar" ? `${color}66` : `${color}33`,
+            pointBackgroundColor: pointColor,
+            pointBorderColor: pointColor,
             borderWidth: lineWidth,
             borderDash: dash,
-            pointRadius: chartType === "bar" ? 0 : chartType === "scatter" || showPointMarkers ? markerSize : 0,
-            pointHoverRadius: Math.max(markerSize + 2, 5),
+            pointRadius: chartType === "bar" ? 0 : chartType === "scatter" || showPointMarkers ? pointSize : 0,
+            pointHoverRadius: Math.max(pointSize + 2, 5),
             tension: 0.18,
             spanGaps: true
           });
@@ -916,9 +975,16 @@ export default function App() {
 
   const chartOptions = useMemo(() => {
     const isEnu = graphMode === "enu";
-    const extent = isEnu && equalScale ? buildExtent(chartBuild.datasets.filter((dataset) => dataset.data.length > 1)) : null;
-    const equal = isEnu && equalScale ? makeEqualScale(extent) : {};
+    const canUseEqualScale = isEnu && equalScale && xScaleType === "linear" && yScaleType === "linear";
+    const extent = canUseEqualScale ? buildExtent(chartBuild.datasets.filter((dataset) => dataset.data.length > 1)) : null;
+    const equal = canUseEqualScale ? makeEqualScale(extent) : {};
     const xType = isEnu ? "number" : resolvedXAxisType;
+    const canUseLogX = isEnu || resolvedXAxisType === "number";
+    const resolvedXScaleType = canUseLogX && xScaleType === "logarithmic"
+      ? "logarithmic"
+      : xType === "category"
+        ? "category"
+        : "linear";
     const xLimitMin = parseAxisLimit(xMin, xType);
     const xLimitMax = parseAxisLimit(xMax, xType);
     const yLimitMin = parseAxisLimit(yMin, "number");
@@ -968,7 +1034,7 @@ export default function App() {
       },
       scales: {
         x: {
-          type: xType === "category" ? "category" : "linear",
+          type: resolvedXScaleType,
           min: xLimitMin ?? equal.x?.min,
           max: xLimitMax ?? equal.x?.max,
           title: { display: true, text: effectiveXLabel, font: { size: axisLabelFontSize } },
@@ -982,6 +1048,7 @@ export default function App() {
           grid: { color: "#e2e8f0" }
         },
         y: {
+          type: yScaleType,
           min: yLimitMin ?? equal.y?.min,
           max: yLimitMax ?? equal.y?.max,
           title: { display: true, text: effectiveYLabel, font: { size: axisLabelFontSize } },
@@ -1007,6 +1074,7 @@ export default function App() {
     titleFontSize,
     xMax,
     xMin,
+    xScaleType,
     yMax,
     yMin
   ]);
@@ -1377,6 +1445,36 @@ export default function App() {
     updateDataset(id, { plotLineStyle: normalizePlotLineStyle(value) });
   }
 
+  function updateDatasetSeriesStyle(id, seriesKey, patch) {
+    setDatasets((current) =>
+      current.map((dataset) => {
+        if (dataset.id !== id) return dataset;
+        const existing = getSeriesStyle(dataset, seriesKey);
+        return {
+          ...dataset,
+          seriesStyles: {
+            ...(dataset.seriesStyles ?? {}),
+            [seriesKey]: { ...existing, ...patch }
+          }
+        };
+      })
+    );
+  }
+
+  function clearDatasetSeriesStyleProperty(id, seriesKey, property) {
+    setDatasets((current) =>
+      current.map((dataset) => {
+        if (dataset.id !== id) return dataset;
+        const nextStyles = { ...(dataset.seriesStyles ?? {}) };
+        const nextStyle = { ...getSeriesStyle(dataset, seriesKey) };
+        delete nextStyle[property];
+        if (Object.keys(nextStyle).length) nextStyles[seriesKey] = nextStyle;
+        else delete nextStyles[seriesKey];
+        return { ...dataset, seriesStyles: nextStyles };
+      })
+    );
+  }
+
   function updateRowFilterDraft(id, patch) {
     setDatasets((current) =>
       current.map((dataset) => (dataset.id === id ? { ...dataset, ...patch } : dataset))
@@ -1455,6 +1553,10 @@ export default function App() {
     setLegendFontSize(DEFAULT_DISPLAY_SETTINGS.legendFontSize);
     setPngBackground(DEFAULT_DISPLAY_SETTINGS.pngBackground);
     setPngScale(DEFAULT_DISPLAY_SETTINGS.pngScale);
+    setImageWidth(DEFAULT_DISPLAY_SETTINGS.imageWidth);
+    setImageHeight(DEFAULT_DISPLAY_SETTINGS.imageHeight);
+    setXScaleType(DEFAULT_DISPLAY_SETTINGS.xScaleType);
+    setYScaleType(DEFAULT_DISPLAY_SETTINGS.yScaleType);
     setDatasets((current) =>
       current.map((dataset) => ({
         ...dataset,
@@ -1472,7 +1574,8 @@ export default function App() {
         plotColor: "auto",
         customPlotColor: "",
         customPlotColorDraft: "",
-        plotLineStyle: "auto"
+        plotLineStyle: "auto",
+        seriesStyles: {}
       }))
     );
     setMessages([{ type: "success", text: "Display settings were reset." }]);
@@ -1507,6 +1610,10 @@ export default function App() {
         axisLabelFontSize,
         tickFontSize,
         legendFontSize,
+        xScaleType,
+        yScaleType,
+        imageWidth,
+        imageHeight,
         pngBackground,
         pngScale
       },
@@ -1526,6 +1633,7 @@ export default function App() {
             visibleGroups: dataset.visibleGroups,
             rowFilter: dataset.rowFilter,
             enuPreset: dataset.enuPreset,
+            seriesStyles: dataset.seriesStyles ?? {},
             ...plotStyleForStorage(dataset),
             calculatedColumns: dataset.calculatedColumns ?? []
           }
@@ -1572,6 +1680,10 @@ export default function App() {
       setAxisLabelFontSize(clampNumber(display.axisLabelFontSize, 8, 30, DEFAULT_DISPLAY_SETTINGS.axisLabelFontSize));
       setTickFontSize(clampNumber(display.tickFontSize, 8, 24, DEFAULT_DISPLAY_SETTINGS.tickFontSize));
       setLegendFontSize(clampNumber(display.legendFontSize, 8, 24, DEFAULT_DISPLAY_SETTINGS.legendFontSize));
+      setXScaleType(AXIS_SCALE_TYPES.some((item) => item.value === display.xScaleType) ? display.xScaleType : DEFAULT_DISPLAY_SETTINGS.xScaleType);
+      setYScaleType(AXIS_SCALE_TYPES.some((item) => item.value === display.yScaleType) ? display.yScaleType : DEFAULT_DISPLAY_SETTINGS.yScaleType);
+      setImageWidth(clampNumber(display.imageWidth, 480, 3000, DEFAULT_DISPLAY_SETTINGS.imageWidth));
+      setImageHeight(clampNumber(display.imageHeight, 320, 2200, DEFAULT_DISPLAY_SETTINGS.imageHeight));
       if (["white", "transparent"].includes(display.pngBackground)) setPngBackground(display.pngBackground);
       if ([1, 2, 3].includes(Number(display.pngScale))) setPngScale(Number(display.pngScale));
       setDatasets((current) => current.map((dataset) => applyStoredDatasetSettings(dataset, datasetSettings)));
@@ -1815,8 +1927,8 @@ export default function App() {
     }
     const srcCanvas = chart.canvas;
     const offscreen = document.createElement("canvas");
-    offscreen.width = srcCanvas.width * pngScale;
-    offscreen.height = srcCanvas.height * pngScale;
+    offscreen.width = imageWidth * pngScale;
+    offscreen.height = imageHeight * pngScale;
     const ctx = offscreen.getContext("2d");
     if (pngBackground === "white") {
       ctx.fillStyle = "#ffffff";
@@ -1967,6 +2079,13 @@ export default function App() {
                   !isValidHexColor(customPlotColorDraft);
                 const plotLineStyleValue = normalizePlotLineStyle(dataset.plotLineStyle);
                 const plotPreviewColor = resolveDatasetColor(dataset, dataset.color);
+                const styleSeriesEntries = graphMode === "enu"
+                  ? dataset.eColumn && dataset.nColumn
+                    ? [{ key: XY_SERIES_STYLE_KEY, label: `XY: ${dataset.eColumn} / ${dataset.nColumn}` }]
+                    : []
+                  : selectedYColumns
+                      .filter((column) => dataset.numericColumns.includes(column))
+                      .map((column) => ({ key: column, label: column }));
                 return (
                 <article className="dataset-card" key={dataset.id}>
                   <div className="dataset-main">
@@ -1994,6 +2113,9 @@ export default function App() {
                     {dataset.invalidNumericCount > 0 && <span>混在値あり</span>}
                     {dataset.encoding && <span>{dataset.encoding}</span>}
                   </div>
+                  <details className="dataset-details" defaultOpen={datasets.length === 1}>
+                    <summary>データ設定を開く</summary>
+                    <div className="dataset-details-body">
                   {dataset.sourceType === "excel" && dataset.sheetNames?.length > 0 && (
                     <label className="preset-row">
                       Sheet
@@ -2060,7 +2182,7 @@ export default function App() {
                   </label>
                   <div className="plot-style-controls">
                     <div className="plot-style-head">
-                      <span>Plot style</span>
+                      <span>CSV全体の初期スタイル</span>
                       <span className={`plot-style-preview line-${plotLineStyleValue}`} aria-hidden="true">
                         <span className="plot-style-swatch" style={{ background: plotPreviewColor }} />
                         <span className="plot-style-line" style={{ borderTopColor: plotPreviewColor }} />
@@ -2107,6 +2229,70 @@ export default function App() {
                     </div>
                     {customPlotColorInvalid && (
                       <p className="field-note">Custom hex must use #RRGGBB. Invalid values are not saved or applied.</p>
+                    )}
+                    <p className="field-note">この設定はCSV全体の初期値です。下の系列別設定が優先されます。</p>
+                  </div>
+                  <div className="series-style-controls">
+                    <div className="series-style-head">
+                      <span>系列ごとの色・点</span>
+                      <small>CSV内の列ごとに個別指定</small>
+                    </div>
+                    {styleSeriesEntries.length === 0 ? (
+                      <p className="field-note">表示するY列またはXY列を選ぶと、系列別設定が表示されます。</p>
+                    ) : (
+                      <div className="series-style-list">
+                        {styleSeriesEntries.map((entry) => {
+                          const seriesStyle = getSeriesStyle(dataset, entry.key);
+                          const resolvedLineColor = resolveSeriesStyleColor(dataset, entry.key, plotPreviewColor);
+                          const resolvedPointColor = resolveSeriesPointColor(dataset, entry.key, resolvedLineColor);
+                          return (
+                            <div className="series-style-row" key={entry.key}>
+                              <strong title={entry.label}>{entry.label}</strong>
+                              <label>
+                                系列色
+                                <span className="color-control">
+                                  <input
+                                    type="color"
+                                    value={resolvedLineColor}
+                                    onChange={(event) => updateDatasetSeriesStyle(dataset.id, entry.key, { color: event.target.value })}
+                                  />
+                                  <button type="button" onClick={() => clearDatasetSeriesStyleProperty(dataset.id, entry.key, "color")}>自動</button>
+                                </span>
+                              </label>
+                              {(chartType === "scatter" || showPointMarkers || graphMode === "enu") && (
+                                <>
+                                  <label>
+                                    点の色
+                                    <span className="color-control">
+                                      <input
+                                        type="color"
+                                        value={resolvedPointColor}
+                                        onChange={(event) => updateDatasetSeriesStyle(dataset.id, entry.key, { pointColor: event.target.value })}
+                                      />
+                                      <button type="button" onClick={() => clearDatasetSeriesStyleProperty(dataset.id, entry.key, "pointColor")}>自動</button>
+                                    </span>
+                                  </label>
+                                  <label>
+                                    点サイズ
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      max="30"
+                                      placeholder={`自動 (${markerSize})`}
+                                      value={seriesStyle.pointSize ?? ""}
+                                      onChange={(event) =>
+                                        updateDatasetSeriesStyle(dataset.id, entry.key, {
+                                          pointSize: event.target.value === "" ? null : clampNumber(event.target.value, 1, 30, markerSize)
+                                        })
+                                      }
+                                    />
+                                  </label>
+                                </>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     )}
                   </div>
                   <label className="preset-row">
@@ -2302,6 +2488,8 @@ export default function App() {
                       </dl>
                     </details>
                   )}
+                    </div>
+                  </details>
                 </article>
                 );
               })
@@ -2314,253 +2502,240 @@ export default function App() {
             <h2>グラフ設定</h2>
             <Settings2 size={18} />
           </div>
+          <p className="settings-intro">上から順に設定してください。高度な項目は折りたたんであります。</p>
 
-          <div className="field">
-            <span>表示モード</span>
-            <div className="segmented two">
-              {GRAPH_MODES.map(({ value, label, icon: Icon }) => (
-                <button
-                  type="button"
-                  className={graphMode === value ? "active" : ""}
-                  onClick={() => setGraphMode(value)}
-                  key={value}
-                >
-                  <Icon size={16} />
-                  <span>{label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="field">
-            <span>グラフ種類</span>
-            <div className="segmented">
-              {CHART_TYPES.map(({ value, label, icon: Icon }) => (
-                <button
-                  type="button"
-                  className={chartType === value ? "active" : ""}
-                  onClick={() => setChartType(value)}
-                  disabled={graphMode === "enu" && value === "bar"}
-                  key={value}
-                >
-                  <Icon size={16} />
-                  <span>{label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <label className="field">
-            <span>Legend mode</span>
-            <select value={legendMode} onChange={(event) => setLegendMode(event.target.value)}>
-              {LEGEND_MODES.map((mode) => (
-                <option key={mode.value} value={mode.value}>{mode.label}</option>
-              ))}
-            </select>
-          </label>
-
-          <div className="field">
-            <span>表示スタイル</span>
-            <div className="style-grid">
-              <label>
-                Line width
-                <select value={lineWidth} onChange={(event) => setLineWidth(Number(event.target.value))}>
-                  {[1, 2, 3, 4, 5].map((value) => (
-                    <option key={value} value={value}>{value}</option>
+          <details className="settings-group" defaultOpen>
+            <summary><span className="step-number">1</span>グラフの種類</summary>
+            <div className="settings-group-body">
+              <div className="field">
+                <span>表示モード</span>
+                <div className="segmented two">
+                  {GRAPH_MODES.map(({ value, label, icon: Icon }) => (
+                    <button
+                      type="button"
+                      className={graphMode === value ? "active" : ""}
+                      onClick={() => setGraphMode(value)}
+                      key={value}
+                    >
+                      <Icon size={16} />
+                      <span>{label}</span>
+                    </button>
                   ))}
-                </select>
-              </label>
-              <label>
-                Markers
-                <select value={showPointMarkers ? "on" : "off"} onChange={(event) => setShowPointMarkers(event.target.value === "on")}>
-                  <option value="off">Off</option>
-                  <option value="on">On</option>
-                </select>
-              </label>
-              <label>
-                Marker size
-                <select value={markerSize} onChange={(event) => setMarkerSize(Number(event.target.value))}>
-                  {[2, 4, 5, 6, 8, 10].map((value) => (
-                    <option key={value} value={value}>{value}</option>
-                  ))}
-                </select>
-              </label>
-              {graphMode === "enu" && (
-                <label>
-                  Start/end marker
-                  <select value={endpointMarkerSize} onChange={(event) => setEndpointMarkerSize(Number(event.target.value))}>
-                    {[6, 8, 9, 10, 12, 14, 16].map((value) => (
-                      <option key={value} value={value}>{value}</option>
-                    ))}
-                  </select>
-                </label>
-              )}
-            </div>
-            {showPointMarkers && (
-              <p className="field-note">点を表示すると、大きいCSVでは描画が重くなる場合があります。</p>
-            )}
-          </div>
-
-          <div className="field">
-            <span>Text Style</span>
-            <div className="style-grid">
-              <label className="number-with-unit">
-                Title font size
-                <span>
-                  <input
-                    type="number"
-                    min="8"
-                    max="36"
-                    value={titleFontSize}
-                    onChange={(event) => setClampedNumber(setTitleFontSize, event.target.value, 8, 36, DEFAULT_DISPLAY_SETTINGS.titleFontSize)}
-                  />
-                  px
-                </span>
-              </label>
-              <label className="number-with-unit">
-                Axis label font size
-                <span>
-                  <input
-                    type="number"
-                    min="8"
-                    max="30"
-                    value={axisLabelFontSize}
-                    onChange={(event) => setClampedNumber(setAxisLabelFontSize, event.target.value, 8, 30, DEFAULT_DISPLAY_SETTINGS.axisLabelFontSize)}
-                  />
-                  px
-                </span>
-              </label>
-              <label className="number-with-unit">
-                Tick font size
-                <span>
-                  <input
-                    type="number"
-                    min="8"
-                    max="24"
-                    value={tickFontSize}
-                    onChange={(event) => setClampedNumber(setTickFontSize, event.target.value, 8, 24, DEFAULT_DISPLAY_SETTINGS.tickFontSize)}
-                  />
-                  px
-                </span>
-              </label>
-              <label className="number-with-unit">
-                Legend font size
-                <span>
-                  <input
-                    type="number"
-                    min="8"
-                    max="24"
-                    value={legendFontSize}
-                    onChange={(event) => setClampedNumber(setLegendFontSize, event.target.value, 8, 24, DEFAULT_DISPLAY_SETTINGS.legendFontSize)}
-                  />
-                  px
-                </span>
-              </label>
-            </div>
-          </div>
-
-          {graphMode === "timeseries" && (
-            <>
-              <label className="field">
-                <span>X軸列を一括適用</span>
-                <select value={globalXColumn} onChange={(event) => applyGlobalX(event.target.value)} disabled={!allXColumns.length}>
-                  <option value="">ファイル別のX列を使用</option>
-                  {allXColumns.map((column) => (
-                    <option key={column} value={column}>{column}</option>
-                  ))}
-                </select>
-              </label>
+                </div>
+              </div>
 
               <div className="field">
-                <span>Y軸列（複数選択）</span>
-                <div className="checkbox-list">
-                  {allNumericColumns.length === 0 ? (
-                    <span className="muted">数値列が見つかると候補が表示されます。</span>
-                  ) : (
-                    allNumericColumns.map((column) => (
-                      <label className="checkbox-row" key={column}>
-                        <input
-                          type="checkbox"
-                          checked={selectedYColumns.includes(column)}
-                          onChange={() => toggleYColumn(column)}
-                        />
-                        <span>{column}</span>
-                        <small>
-                          {datasets.filter((dataset) => dataset.numericColumns.includes(column)).length}/{datasets.length}
-                        </small>
-                      </label>
-                    ))
+                <span>グラフ種類</span>
+                <div className="segmented">
+                  {CHART_TYPES.map(({ value, label, icon: Icon }) => (
+                    <button
+                      type="button"
+                      className={chartType === value ? "active" : ""}
+                      onClick={() => setChartType(value)}
+                      disabled={graphMode === "enu" && value === "bar"}
+                      key={value}
+                    >
+                      <Icon size={16} />
+                      <span>{label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <label className="field">
+                <span>凡例</span>
+                <select value={legendMode} onChange={(event) => setLegendMode(event.target.value)}>
+                  {LEGEND_MODES.map((mode) => (
+                    <option key={mode.value} value={mode.value}>{mode.label}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </details>
+
+          <details className="settings-group" defaultOpen>
+            <summary><span className="step-number">2</span>表示するデータ</summary>
+            <div className="settings-group-body">
+              {graphMode === "timeseries" ? (
+                <>
+                  <label className="field">
+                    <span>X軸列を一括適用</span>
+                    <select value={globalXColumn} onChange={(event) => applyGlobalX(event.target.value)} disabled={!allXColumns.length}>
+                      <option value="">ファイル別のX列を使用</option>
+                      {allXColumns.map((column) => (
+                        <option key={column} value={column}>{column}</option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <div className="field">
+                    <span>Y軸列（複数選択）</span>
+                    <div className="checkbox-list">
+                      {allNumericColumns.length === 0 ? (
+                        <span className="muted">数値列が見つかると候補が表示されます。</span>
+                      ) : (
+                        allNumericColumns.map((column) => (
+                          <label className="checkbox-row" key={column}>
+                            <input
+                              type="checkbox"
+                              checked={selectedYColumns.includes(column)}
+                              onChange={() => toggleYColumn(column)}
+                            />
+                            <span>{column}</span>
+                            <small>{datasets.filter((dataset) => dataset.numericColumns.includes(column)).length}/{datasets.length}</small>
+                          </label>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <p className="field-note">XY X・XY Yは各ファイルカードの「データ設定を開く」で選択します。</p>
+              )}
+              <p className="field-note">系列ごとの色・点色・点サイズも各ファイルカード内で設定できます。</p>
+            </div>
+          </details>
+
+          <details className="settings-group">
+            <summary><span className="step-number">3</span>軸と見た目</summary>
+            <div className="settings-group-body">
+              <div className="field">
+                <span>軸スケール</span>
+                <div className="style-grid">
+                  <label>
+                    X軸
+                    <select
+                      value={xScaleType}
+                      onChange={(event) => setXScaleType(event.target.value)}
+                      disabled={graphMode !== "enu" && resolvedXAxisType !== "number"}
+                    >
+                      {AXIS_SCALE_TYPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+                    </select>
+                  </label>
+                  <label>
+                    Y軸
+                    <select value={yScaleType} onChange={(event) => setYScaleType(event.target.value)}>
+                      {AXIS_SCALE_TYPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+                    </select>
+                  </label>
+                </div>
+                {(xScaleType === "logarithmic" || yScaleType === "logarithmic") && (
+                  <p className="field-note">対数軸では0以下の値は表示されません。</p>
+                )}
+              </div>
+
+              {graphMode === "enu" && xScaleType === "linear" && yScaleType === "linear" && (
+                <label className="toggle-row">
+                  <input type="checkbox" checked={equalScale} onChange={(event) => setEqualScale(event.target.checked)} />
+                  <span>XY軸を等倍にする</span>
+                </label>
+              )}
+
+              <div className="field">
+                <span>線と点</span>
+                <div className="style-grid">
+                  <label>
+                    Line width
+                    <select value={lineWidth} onChange={(event) => setLineWidth(Number(event.target.value))}>
+                      {[1, 2, 3, 4, 5].map((value) => <option key={value} value={value}>{value}</option>)}
+                    </select>
+                  </label>
+                  <label>
+                    Markers
+                    <select value={showPointMarkers ? "on" : "off"} onChange={(event) => setShowPointMarkers(event.target.value === "on")}>
+                      <option value="off">Off</option>
+                      <option value="on">On</option>
+                    </select>
+                  </label>
+                  <label>
+                    既定の点サイズ
+                    <select value={markerSize} onChange={(event) => setMarkerSize(Number(event.target.value))}>
+                      {[2, 4, 5, 6, 8, 10, 12, 16].map((value) => <option key={value} value={value}>{value}</option>)}
+                    </select>
+                  </label>
+                  {graphMode === "enu" && (
+                    <label>
+                      Start/end marker
+                      <select value={endpointMarkerSize} onChange={(event) => setEndpointMarkerSize(Number(event.target.value))}>
+                        {[6, 8, 9, 10, 12, 14, 16].map((value) => <option key={value} value={value}>{value}</option>)}
+                      </select>
+                    </label>
                   )}
                 </div>
               </div>
-            </>
-          )}
 
-          {graphMode === "enu" && (
-            <label className="toggle-row">
-              <input type="checkbox" checked={equalScale} onChange={(event) => setEqualScale(event.target.checked)} />
-              <span>軸スケールを等倍にする</span>
-            </label>
-          )}
+              <div className="field">
+                <span>ラベル編集</span>
+                <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={axisFallback.title} />
+                <input value={xAxisLabel} onChange={(event) => setXAxisLabel(event.target.value)} placeholder={axisFallback.x} />
+                <input value={yAxisLabel} onChange={(event) => setYAxisLabel(event.target.value)} placeholder={axisFallback.y} />
+              </div>
 
-          <div className="field">
-            <span>ラベル編集</span>
-            <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={axisFallback.title} />
-            <input value={xAxisLabel} onChange={(event) => setXAxisLabel(event.target.value)} placeholder={axisFallback.x} />
-            <input value={yAxisLabel} onChange={(event) => setYAxisLabel(event.target.value)} placeholder={axisFallback.y} />
-          </div>
+              <div className="field">
+                <span>表示範囲（任意）</span>
+                <div className="range-grid">
+                  <input value={xMin} onChange={(event) => setXMin(event.target.value)} placeholder="X min" />
+                  <input value={xMax} onChange={(event) => setXMax(event.target.value)} placeholder="X max" />
+                  <input value={yMin} onChange={(event) => setYMin(event.target.value)} placeholder="Y min" />
+                  <input value={yMax} onChange={(event) => setYMax(event.target.value)} placeholder="Y max" />
+                </div>
+              </div>
 
-          <div className="field">
-            <span>表示範囲（任意）</span>
-            <div className="range-grid">
-              <input value={xMin} onChange={(event) => setXMin(event.target.value)} placeholder="X min" />
-              <input value={xMax} onChange={(event) => setXMax(event.target.value)} placeholder="X max" />
-              <input value={yMin} onChange={(event) => setYMin(event.target.value)} placeholder="Y min" />
-              <input value={yMax} onChange={(event) => setYMax(event.target.value)} placeholder="Y max" />
+              <details className="nested-settings">
+                <summary>文字サイズ</summary>
+                <div className="style-grid">
+                  <label className="number-with-unit">Title font size<span><input type="number" min="8" max="36" value={titleFontSize} onChange={(event) => setClampedNumber(setTitleFontSize, event.target.value, 8, 36, DEFAULT_DISPLAY_SETTINGS.titleFontSize)} />px</span></label>
+                  <label className="number-with-unit">Axis label font size<span><input type="number" min="8" max="30" value={axisLabelFontSize} onChange={(event) => setClampedNumber(setAxisLabelFontSize, event.target.value, 8, 30, DEFAULT_DISPLAY_SETTINGS.axisLabelFontSize)} />px</span></label>
+                  <label className="number-with-unit">Tick font size<span><input type="number" min="8" max="24" value={tickFontSize} onChange={(event) => setClampedNumber(setTickFontSize, event.target.value, 8, 24, DEFAULT_DISPLAY_SETTINGS.tickFontSize)} />px</span></label>
+                  <label className="number-with-unit">Legend font size<span><input type="number" min="8" max="24" value={legendFontSize} onChange={(event) => setClampedNumber(setLegendFontSize, event.target.value, 8, 24, DEFAULT_DISPLAY_SETTINGS.legendFontSize)} />px</span></label>
+                </div>
+              </details>
             </div>
-          </div>
+          </details>
 
-          <div className="field">
-            <span>Settings</span>
-            <div className="settings-actions">
-              <button type="button" onClick={resetDisplaySettings}>Reset display settings</button>
-              <button type="button" onClick={exportSettings}>Export settings</button>
-              <button type="button" onClick={() => settingsInputRef.current?.click()}>Import settings</button>
+          <details className="settings-group">
+            <summary><span className="step-number">4</span>画像保存・設定</summary>
+            <div className="settings-group-body">
+              <div className="field">
+                <span>画像サイズ</span>
+                <div className="style-grid">
+                  <label className="number-with-unit">幅<span><input type="number" min="480" max="3000" value={imageWidth} onChange={(event) => setClampedNumber(setImageWidth, event.target.value, 480, 3000, DEFAULT_DISPLAY_SETTINGS.imageWidth)} />px</span></label>
+                  <label className="number-with-unit">高さ<span><input type="number" min="320" max="2200" value={imageHeight} onChange={(event) => setClampedNumber(setImageHeight, event.target.value, 320, 2200, DEFAULT_DISPLAY_SETTINGS.imageHeight)} />px</span></label>
+                  <label>
+                    Background
+                    <select value={pngBackground} onChange={(event) => setPngBackground(event.target.value)}>
+                      <option value="white">White</option>
+                      <option value="transparent">Transparent</option>
+                    </select>
+                  </label>
+                  <label>
+                    解像度倍率
+                    <select value={pngScale} onChange={(event) => setPngScale(Number(event.target.value))}>
+                      <option value={1}>1×</option>
+                      <option value={2}>2×</option>
+                      <option value={3}>3×</option>
+                    </select>
+                  </label>
+                </div>
+                <p className="field-note">保存PNG: {(imageWidth * pngScale).toLocaleString()} × {(imageHeight * pngScale).toLocaleString()} px</p>
+              </div>
+
+              <div className="field">
+                <span>設定ファイル</span>
+                <div className="settings-actions">
+                  <button type="button" onClick={resetDisplaySettings}>Reset</button>
+                  <button type="button" onClick={exportSettings}>Export</button>
+                  <button type="button" onClick={() => settingsInputRef.current?.click()}>Import</button>
+                </div>
+                <input ref={settingsInputRef} type="file" accept="application/json,.json" onChange={(event) => importSettings(event.target.files?.[0])} hidden />
+              </div>
+
+              <button type="button" className="download-button" onClick={downloadChart} disabled={!hasChart}>
+                <Download size={17} />
+                {graphMode === "enu" ? "Save XY Plot PNG" : "Save Time Series PNG"}
+              </button>
             </div>
-            <input
-              ref={settingsInputRef}
-              type="file"
-              accept="application/json,.json"
-              onChange={(event) => importSettings(event.target.files?.[0])}
-              hidden
-            />
-          </div>
-
-          <div className="field">
-            <span>PNG保存設定</span>
-            <div className="style-grid">
-              <label>
-                Background
-                <select value={pngBackground} onChange={(event) => setPngBackground(event.target.value)}>
-                  <option value="white">White</option>
-                  <option value="transparent">Transparent</option>
-                </select>
-              </label>
-              <label>
-                Scale
-                <select value={pngScale} onChange={(event) => setPngScale(Number(event.target.value))}>
-                  <option value={1}>1× (standard)</option>
-                  <option value={2}>2× (recommended)</option>
-                  <option value={3}>3× (high-res)</option>
-                </select>
-              </label>
-            </div>
-          </div>
-
-          <button type="button" className="download-button" onClick={downloadChart} disabled={!hasChart}>
-            <Download size={17} />
-            {graphMode === "enu" ? "Save XY Plot PNG" : "Save Time Series PNG"}
-          </button>
+          </details>
         </aside>
 
         <section className="panel chart-panel">
@@ -2597,7 +2772,10 @@ export default function App() {
               <span>表示を軽くするため、系列あたり最大 {MAX_POINTS_PER_SERIES.toLocaleString()} 点に間引いています。</span>
             </div>
           )}
-          <div className={`chart-frame ${graphMode === "enu" && equalScale ? "square" : ""}`}>
+          <div
+            className={`chart-frame ${graphMode === "enu" && equalScale && xScaleType === "linear" && yScaleType === "linear" ? "square" : ""}`}
+            style={{ height: `${Math.min(imageHeight, 1100)}px` }}
+          >
             {hasChart ? chartComponent : <div className="empty-state">CSV/Excelを読み込み、表示するファイルと列を選択してください。</div>}
           </div>
         </section>
