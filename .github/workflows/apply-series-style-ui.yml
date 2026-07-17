@@ -16,68 +16,26 @@ jobs:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
-      - name: Check out feature branch
-        uses: actions/checkout@v4
-        with:
-          ref: feature/series-style-ui-controls
-          fetch-depth: 1
-          show-progress: false
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-
-      - name: Reconstruct and apply update
-        id: apply_update
+      - name: Apply, build, validate, and commit
         shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set +e
+          git clone --quiet --depth 1 --branch feature/series-style-ui-controls "https://x-access-token:${GH_TOKEN}@github.com/chihall0828/CSV_Data_Compare.git" repo
+          cd repo
+
           cat scripts/.series-style-patch/patch.gz.b64.* > /tmp/patch.b64
-          b64_hash=$(sha256sum /tmp/patch.b64 | cut -d' ' -f1)
+          echo "payload=$(sha256sum /tmp/patch.b64 | cut -d' ' -f1)"
           base64 --decode /tmp/patch.b64 > /tmp/patch.py.gz
-          decode_status=$?
           gzip --test /tmp/patch.py.gz
-          gzip_status=$?
-          if [ "$decode_status" -eq 0 ] && [ "$gzip_status" -eq 0 ]; then
-            gzip --decompress --stdout /tmp/patch.py.gz > /tmp/apply-series-style-ui-update.py
-            script_hash=$(sha256sum /tmp/apply-series-style-ui-update.py | cut -d' ' -f1)
-            python /tmp/apply-series-style-ui-update.py > patch-error.log 2>&1
-            patch_status=$?
-          else
-            script_hash="not-generated"
-            patch_status=99
-          fi
-          set -e
+          gzip --decompress --stdout /tmp/patch.py.gz > /tmp/apply-series-style-ui-update.py
+          echo "script=$(sha256sum /tmp/apply-series-style-ui-update.py | cut -d' ' -f1)"
+          python /tmp/apply-series-style-ui-update.py
 
-          if [ "$decode_status" -ne 0 ] || [ "$gzip_status" -ne 0 ] || [ "$patch_status" -ne 0 ]; then
-            {
-              echo "base64_sha256=$b64_hash"
-              echo "expected_base64_sha256=53062256ab59860a98e189682b3a442881546f8b85e0a6940fc0cdc2f1b7da51"
-              echo "decode_status=$decode_status"
-              echo "gzip_status=$gzip_status"
-              echo "script_sha256=$script_hash"
-              echo "expected_script_sha256=d1408509ca495a503cff87149fa44c81555e3b384b82751f7d31948a24cb841a"
-              echo "patch_status=$patch_status"
-            } >> patch-error.log
-            cat patch-error.log
-            exit 1
-          fi
-          rm -f patch-error.log
+          npm ci --silent
+          npm run build
+          npm run validate:plot-style
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build application
-        run: npm run build
-
-      - name: Validate plot styles
-        run: npm run validate:plot-style
-
-      - name: Commit generated implementation
-        shell: bash
-        run: |
           rm -rf scripts/.series-style-patch
           rm .github/workflows/apply-series-style-ui.yml
           git config user.name "github-actions[bot]"
