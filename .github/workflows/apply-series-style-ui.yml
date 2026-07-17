@@ -28,15 +28,16 @@ jobs:
           echo "payload=$(sha256sum /tmp/patch.b64 | cut -d' ' -f1)"
           base64 --decode /tmp/patch.b64 > /tmp/patch.py.gz
           gzip --test /tmp/patch.py.gz
-          gzip --decompress --stdout /tmp/patch.py.gz > /tmp/apply-series-style-ui-update.py
-          echo "script=$(sha256sum /tmp/apply-series-style-ui-update.py | cut -d' ' -f1)"
-          python /tmp/apply-series-style-ui-update.py
+          gzip --decompress --stdout /tmp/patch.py.gz > scripts/apply-series-style-ui-update.py
+          echo "script=$(sha256sum scripts/apply-series-style-ui-update.py | cut -d' ' -f1)"
+          python scripts/apply-series-style-ui-update.py
 
           npm ci --silent
           npm run build
           npm run validate:plot-style
 
           rm -rf scripts/.series-style-patch
+          rm scripts/apply-series-style-ui-update.py
           rm .github/workflows/apply-series-style-ui.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
