@@ -20,7 +20,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: feature/series-style-ui-controls
-          fetch-depth: 0
+          fetch-depth: 1
+          show-progress: false
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -61,11 +62,6 @@ jobs:
               echo "patch_status=$patch_status"
             } >> patch-error.log
             cat patch-error.log
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add patch-error.log
-            git commit -m "Record series style patch failure"
-            git push origin feature/series-style-ui-controls
             exit 1
           fi
           rm -f patch-error.log
