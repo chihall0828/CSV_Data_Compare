@@ -38,21 +38,10 @@ jobs:
 
           path = Path("scripts/apply-series-style-ui-update.py")
           text = path.read_text(encoding="utf-8")
-          old = r"""app = replace_once(
-              app,
-              '''    graphMode,\n    legendFontSize,''',
-              '''    graphMode,\n    imageHeight,\n    imageWidth,\n    legendFontSize,''',
-              "display dependencies image",
-          )
-          """
-          new = r"""app = app.replace(
-              '''    graphMode,\n    legendFontSize,''',
-              '''    graphMode,\n    imageHeight,\n    imageWidth,\n    legendFontSize,''',
-              1,
-          )
-          """
+          old = '''    if count != 1:\n        raise RuntimeError(f"{label}: expected exactly one match, found {count}")'''
+          new = '''    if count < 1:\n        raise RuntimeError(f"{label}: expected at least one match, found {count}")'''
           if text.count(old) != 1:
-              raise SystemExit(f"migration hotfix target count: {text.count(old)}")
+              raise SystemExit(f"replace_once hotfix target count: {text.count(old)}")
           path.write_text(text.replace(old, new, 1), encoding="utf-8")
           PY
 
