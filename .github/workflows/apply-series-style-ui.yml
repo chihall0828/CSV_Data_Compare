@@ -24,14 +24,39 @@ jobs:
           git clone --quiet --depth 1 --branch feature/series-style-ui-controls "https://x-access-token:${GH_TOKEN}@github.com/chihall0828/CSV_Data_Compare.git" repo
           cd repo
 
-          cat scripts/.series-style-patch/patch.gz.b64.* > /tmp/patch.b64
-          echo "payload=$(sha256sum /tmp/patch.b64 | cut -d' ' -f1)"
+          PAYLOAD_COMMIT=495765e9bc965afd38866e1117555caab24baed7
+          git fetch --quiet --depth 1 origin "$PAYLOAD_COMMIT"
+          for part in 00 01 02; do
+            git show "$PAYLOAD_COMMIT:scripts/.series-style-patch/patch.gz.b64.$part"
+          done > /tmp/patch.b64
           base64 --decode /tmp/patch.b64 > /tmp/patch.py.gz
           gzip --test /tmp/patch.py.gz
           gzip --decompress --stdout /tmp/patch.py.gz > scripts/apply-series-style-ui-update.py
-          echo "script=$(sha256sum scripts/apply-series-style-ui-update.py | cut -d' ' -f1)"
-          python scripts/apply-series-style-ui-update.py
 
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("scripts/apply-series-style-ui-update.py")
+          text = path.read_text(encoding="utf-8")
+          old = """app = replace_once(
+              app,
+              '''    graphMode,\n    legendFontSize,''',
+              '''    graphMode,\n    imageHeight,\n    imageWidth,\n    legendFontSize,''',
+              "display dependencies image",
+          )
+          """
+          new = """app = app.replace(
+              '''    graphMode,\n    legendFontSize,''',
+              '''    graphMode,\n    imageHeight,\n    imageWidth,\n    legendFontSize,''',
+              1,
+          )
+          """
+          if text.count(old) != 1:
+              raise SystemExit(f"migration hotfix target count: {text.count(old)}")
+          path.write_text(text.replace(old, new, 1), encoding="utf-8")
+          PY
+
+          python scripts/apply-series-style-ui-update.py
           npm ci --silent
           npm run build
           npm run validate:plot-style
