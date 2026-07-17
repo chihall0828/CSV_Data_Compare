@@ -32,8 +32,34 @@ jobs:
         id: apply_update
         shell: bash
         run: |
-          cat scripts/.series-style-patch/patch.gz.b64.* | base64 --decode | gzip --decompress > /tmp/apply-series-style-ui-update.py
-          if ! python /tmp/apply-series-style-ui-update.py > patch-error.log 2>&1; then
+          set +e
+          cat scripts/.series-style-patch/patch.gz.b64.* > /tmp/patch.b64
+          b64_hash=$(sha256sum /tmp/patch.b64 | cut -d' ' -f1)
+          base64 --decode /tmp/patch.b64 > /tmp/patch.py.gz
+          decode_status=$?
+          gzip --test /tmp/patch.py.gz
+          gzip_status=$?
+          if [ "$decode_status" -eq 0 ] && [ "$gzip_status" -eq 0 ]; then
+            gzip --decompress --stdout /tmp/patch.py.gz > /tmp/apply-series-style-ui-update.py
+            script_hash=$(sha256sum /tmp/apply-series-style-ui-update.py | cut -d' ' -f1)
+            python /tmp/apply-series-style-ui-update.py > patch-error.log 2>&1
+            patch_status=$?
+          else
+            script_hash="not-generated"
+            patch_status=99
+          fi
+          set -e
+
+          if [ "$decode_status" -ne 0 ] || [ "$gzip_status" -ne 0 ] || [ "$patch_status" -ne 0 ]; then
+            {
+              echo "base64_sha256=$b64_hash"
+              echo "expected_base64_sha256=53062256ab59860a98e189682b3a442881546f8b85e0a6940fc0cdc2f1b7da51"
+              echo "decode_status=$decode_status"
+              echo "gzip_status=$gzip_status"
+              echo "script_sha256=$script_hash"
+              echo "expected_script_sha256=d1408509ca495a503cff87149fa44c81555e3b384b82751f7d31948a24cb841a"
+              echo "patch_status=$patch_status"
+            } >> patch-error.log
             cat patch-error.log
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
