@@ -38,14 +38,14 @@ jobs:
 
           path = Path("scripts/apply-series-style-ui-update.py")
           text = path.read_text(encoding="utf-8")
-          old = """app = replace_once(
+          old = r"""app = replace_once(
               app,
               '''    graphMode,\n    legendFontSize,''',
               '''    graphMode,\n    imageHeight,\n    imageWidth,\n    legendFontSize,''',
               "display dependencies image",
           )
           """
-          new = """app = app.replace(
+          new = r"""app = app.replace(
               '''    graphMode,\n    legendFontSize,''',
               '''    graphMode,\n    imageHeight,\n    imageWidth,\n    legendFontSize,''',
               1,
