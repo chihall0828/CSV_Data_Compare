@@ -629,8 +629,7 @@ export default function App() {
     yAxisLabel,
     yScaleType,
     yMax,
-    yMin,
-    yScaleType
+    yMin
   ]);
 
   useEffect(() => {
@@ -1076,7 +1075,8 @@ export default function App() {
     xMin,
     xScaleType,
     yMax,
-    yMin
+    yMin,
+    yScaleType
   ]);
 
   const hasChart = chartBuild.datasets.length > 0;
